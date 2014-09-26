@@ -5,6 +5,8 @@ namespace yz\shoppingcart;
 use yii\base\Component;
 use yii\base\Event;
 use Yii;
+use \common\models\Cart;
+use \common\models\Product;
 
 
 /**
@@ -68,10 +70,31 @@ class ShoppingCart extends Component
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'put', 'position' => $this->_positions[$position->getId()]],
         ]));
+		$qty = $this->_positions[$position->getId()]->getQuantity();
+		$this->saveToDb($position, $qty);
         $this->saveToSession();
     }
 
-    /**
+
+	public function saveToDb($position,$qty){
+
+		$model = new Cart();
+		$model2 = $model->findOne(['id_erp'=>$position->remote_id_charisma, 'session'=>Yii::$app->session->id]);
+		if($model2) {
+			$model2->qty= $qty;
+			$model2->save();
+		}
+		else {
+			$model->id_erp = $position->remote_id_charisma;
+			$model->qty = 1;
+			$model->session = Yii::$app->session->id;
+			$model->price = $position->price;
+			if ($model->save()) {
+			}
+		}
+	}
+
+	/**
      * @param CartPositionInterface $position
      * @param int $quantity
      */
@@ -81,15 +104,17 @@ class ShoppingCart extends Component
             $this->remove($position);
             return;
         }
-
+		var_dump($quantity);
         if (isset($this->_positions[$position->getId()])) {
             $this->_positions[$position->getId()]->setQuantity($quantity);
+
         } else {
             $position->setQuantity($quantity);
             $this->_positions[$position->getId()] = $position;
         }
+		//var_dump($this->_positions[$position->getId()]);
         $this->trigger(self::EVENT_POSITION_UPDATE, new Event([
-            'data' => $this->_positions[$position->getId()],
+            'data' => 464,
         ]));
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'update', 'position' => $this->_positions[$position->getId()]],
