@@ -6,8 +6,6 @@ use yii\base\Component;
 use yii\base\Event;
 use Yii;
 use \common\models\Cart;
-use \common\models\Product;
-use yii\web\User;
 
 
 /**
@@ -79,7 +77,7 @@ class ShoppingCart extends Component
         $this->saveToSession();
     }
 
-	public function saveToDb($position,$qty){
+	public function saveToDb($position,$qty, $status=1){
 		$erp= self::ID_ERP;
 		$model = new Cart();
 		if (!\Yii::$app->user->isGuest) {
@@ -90,18 +88,21 @@ class ShoppingCart extends Component
 			$id_user = null;
 			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id]);
 		}
-
 		if($model2) {
 			$model2->qty= $qty;
-			$model2->save();
+            $model2->status = $status;
+            if (!$model2->save()) {
+                throw new \Exception('');
+            }
 		}
 		else {
+            $model->id_user = $id_user;
 			$model->id_erp = $position->$erp;
 			$model->qty = 1;
 			$model->session = Yii::$app->session->id;
 			$model->price = $position->price;
 			if (!$model->save()) {
-				throw new \Exception($message);
+				throw new \Exception('');
 			}
 		}
 	}
@@ -125,9 +126,9 @@ class ShoppingCart extends Component
     {
         if ($quantity <= 0) {
             $this->remove($position);
+            $this->saveToDb($position,$quantity, $status = 0);
             return;
         }
-		var_dump($quantity);
         if (isset($this->_positions[$position->getId()])) {
             $this->_positions[$position->getId()]->setQuantity($quantity);
 
@@ -135,13 +136,13 @@ class ShoppingCart extends Component
             $position->setQuantity($quantity);
             $this->_positions[$position->getId()] = $position;
         }
-		//var_dump($this->_positions[$position->getId()]);
         $this->trigger(self::EVENT_POSITION_UPDATE, new Event([
             'data' => 464,
         ]));
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'update', 'position' => $this->_positions[$position->getId()]],
         ]));
+        $this->saveToDb($position,$quantity);
         $this->saveToSession();
     }
 
@@ -157,6 +158,7 @@ class ShoppingCart extends Component
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'remove', 'position' => $this->_positions[$position->getId()]],
         ]));
+        $this->saveToDb($position,0,0);
         unset($this->_positions[$position->getId()]);
         $this->saveToSession();
     }
@@ -166,10 +168,17 @@ class ShoppingCart extends Component
      */
     public function removeAll()
     {
+        $this->loadFromSession();
+        $products = $this->_positions;
+        foreach($products as $p) {
+            $this->saveToDb($p, 0, 0);
+        }
         $this->_positions = [];
+
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'removeAll'],
         ]));
+
         $this->saveToSession();
     }
 
@@ -274,6 +283,8 @@ class ShoppingCart extends Component
     protected function saveToSession()
     {
         Yii::$app->session[$this->cartId] = serialize($this->_positions);
+        //var_dump(Yii::$app->session[$this->cartId]);
+        //die();
     }
 
     protected function loadFromSession()
