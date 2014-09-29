@@ -7,6 +7,7 @@ use yii\base\Event;
 use Yii;
 use \common\models\Cart;
 use \common\models\Product;
+use yii\web\User;
 
 
 /**
@@ -31,6 +32,9 @@ class ShoppingCart extends Component
     const EVENT_CART_CHANGE = 'cartChange';
     /** Triggered on after cart cost calculation */
     const EVENT_COST_CALCULATION = 'costCalculation';
+
+	/** To define de primary key from product model */
+	const ID_ERP = 'remote_id_charisma';
 
     /**
      * Shopping cart ID to support multiple carts
@@ -75,21 +79,40 @@ class ShoppingCart extends Component
         $this->saveToSession();
     }
 
-
 	public function saveToDb($position,$qty){
-
+		$erp= self::ID_ERP;
 		$model = new Cart();
-		$model2 = $model->findOne(['id_erp'=>$position->remote_id_charisma, 'session'=>Yii::$app->session->id]);
+		if (!\Yii::$app->user->isGuest) {
+			$id_user = \Yii::$app->user->getId();
+			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user]);
+		}
+		else {
+			$id_user = null;
+			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id]);
+		}
+
 		if($model2) {
 			$model2->qty= $qty;
 			$model2->save();
 		}
 		else {
-			$model->id_erp = $position->remote_id_charisma;
+			$model->id_erp = $position->$erp;
 			$model->qty = 1;
 			$model->session = Yii::$app->session->id;
 			$model->price = $position->price;
-			if ($model->save()) {
+			if (!$model->save()) {
+				throw new \Exception($message);
+			}
+		}
+	}
+	/** save user to db on login for all lines where session = $session */
+	public function saveUserToDB($session) {
+		$model1 = new Cart();
+		$model = $model1->findAll(['session'=>$session]);
+		if(isset($model)) {
+			foreach($model as $mods) {
+				$mods->id_user = Yii::$app->user->getId();
+				$mods->save();
 			}
 		}
 	}
