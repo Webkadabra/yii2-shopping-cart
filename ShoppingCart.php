@@ -2,6 +2,7 @@
 
 namespace yz\shoppingcart;
 
+use frontend\models\Product;
 use yii\base\Component;
 use yii\base\Event;
 use Yii;
@@ -210,7 +211,24 @@ class ShoppingCart extends Component
      */
     public function getPositions()
     {
-        return $this->_positions;
+        $erp= self::ID_ERP;
+
+        if (!\Yii::$app->user->isGuest) {
+            $model= new Cart();
+            $model2 = $model->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1]);
+            $prod= array();
+            foreach($model2 as $model) {
+                $obs = new Product();
+                $obs = $obs->findOne([$erp=>$model->id_erp]);
+                $prod[$model->id_erp] = $obs;
+                $prod[$model->id_erp]->quantity = $model->qty;
+
+            }
+            return $prod;
+        }
+        else {
+            return $this->_positions;
+        }
     }
 
     /**
