@@ -108,13 +108,23 @@ class ShoppingCart extends Component
 		}
 	}
 	/** save user to db on login for all lines where session = $session */
-	public function saveUserToDB($session) {
+	public function saveUserToDB($session) { //problema : daca produsul se afla deja in cosul userului, trebuie facuta suma produselor.
 		$model1 = new Cart();
 		$model = $model1->findAll(['session'=>$session]);
 		if(isset($model)) {
+            //var_dump($model);die();
 			foreach($model as $mods) {
-				$mods->id_user = Yii::$app->user->getId();
-				$mods->save();
+                $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_erp'=>$mods->id_erp]);
+                if(!is_null($model2)) { //if product is already in user cart
+                    $model2->qty = $mods->qty + $model2->qty;
+                    $model2->status = 1;
+                    $model2->save();
+                    $mods->delete();
+                }
+                else {
+                    $mods->id_user = Yii::$app->user->getId();
+                    $mods->save();
+                }
 			}
 		}
 	}
@@ -153,15 +163,20 @@ class ShoppingCart extends Component
      */
     public function remove($position)
     {
-        $this->trigger(self::EVENT_BEFORE_POSITION_REMOVE, new Event([
-            'data' => $this->_positions[$position->getId()],
-        ]));
-        $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'remove', 'position' => $this->_positions[$position->getId()]],
-        ]));
+        //var_dump($position);die();
+        $erp= self::ID_ERP;
+        //var_dump($this->_positions);die();
+        if(array_key_exists($position->$erp, $this->_positions)) {
+            $this->trigger(self::EVENT_BEFORE_POSITION_REMOVE, new Event([
+                'data' => $this->_positions[$position->getId()],
+            ]));
+            $this->trigger(self::EVENT_CART_CHANGE, new Event([
+                'data' => ['action' => 'remove', 'position' => $this->_positions[$position->getId()]],
+            ]));
+            unset($this->_positions[$position->getId()]);
+            $this->saveToSession();
+        }
         $this->saveToDb($position,0,0);
-        unset($this->_positions[$position->getId()]);
-        $this->saveToSession();
     }
 
     /**
@@ -169,18 +184,27 @@ class ShoppingCart extends Component
      */
     public function removeAll()
     {
+        $erp= self::ID_ERP;
+        //for session- >remove all from session
         $this->loadFromSession();
         $products = $this->_positions;
         foreach($products as $p) {
             $this->saveToDb($p, 0, 0);
         }
         $this->_positions = [];
-
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'removeAll'],
         ]));
-
         $this->saveToSession();
+
+        // remove all from cart for current user
+        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1]);
+        foreach ($models as $model) {
+            $model2 = Product::findOne([$erp=>$model->id_erp]);
+            if(!is_null($model2)) {
+                $this->saveToDb($model2, 0, 0);
+            }
+        }
     }
 
     /**
