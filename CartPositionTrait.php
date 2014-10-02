@@ -7,12 +7,14 @@ use yii\base\Model;
 /**
  * Trait CartPositionTrait
  * @property int $quantity Returns quantity of cart position
+ * @property string $wishlist Returns wishlist value
  * @property int $cost Returns cost of cart position. Default value is 'price * quantity'
  * @package yz\shoppingcart
  */
 trait CartPositionTrait
 {
     protected $_quantity;
+    protected $_wishlist;
 
     public function getQuantity()
     {
@@ -22,6 +24,16 @@ trait CartPositionTrait
     public function setQuantity($quantity)
     {
         $this->_quantity = $quantity;
+    }
+
+    public function getWishlist()
+    {
+        return $this->_wishlist;
+    }
+
+    public function setWishlist($wishlist)
+    {
+        $this->_wishlist = $wishlist;
     }
 
     /**

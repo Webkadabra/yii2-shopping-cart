@@ -6,7 +6,7 @@ use frontend\models\Product;
 use yii\base\Component;
 use yii\base\Event;
 use Yii;
-use \common\models\Cart;
+use frontend\models\Cart;
 
 
 /**
@@ -58,40 +58,57 @@ class ShoppingCart extends Component
      * @param CartPositionInterface $position
      * @param int $quantity
      */
-    public function put($position, $quantity = 1)
+    //todo scoatem wishlist_status????
+    public function put($position, $quantity = 1, $wishlist, $wishlist_status=1) //scoatem wishlist_status????
     {
-        if (isset($this->_positions[$position->getId()])) {
-            $this->_positions[$position->getId()]->setQuantity(
-                $this->_positions[$position->getId()]->getQuantity() + $quantity);
+        if(is_null($wishlist)) {
+            $id= "cart-".$position->getId();
+        }
+        else {
+            $id= "wish-".$position->getId();
+        }
+        if (isset($this->_positions[$id])) {
+            $this->_positions[$id]->
+            setQuantity($this->_positions[$id]->getQuantity() + $quantity);
+            $this->_positions[$id]->
+            setWishlist($this->_positions[$id]->getWishlist());
         } else {
             $position->setQuantity($quantity);
-            $this->_positions[$position->getId()] = $position;
+            $this->_positions[$id] = $position;
+
+            $position->setWishlist($wishlist);
+            $this->_positions[$id] = $position;
         }
+
+
         $this->trigger(self::EVENT_POSITION_PUT, new Event([
-            'data' => $this->_positions[$position->getId()],
+            'data' => $this->_positions[$id],
         ]));
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'put', 'position' => $this->_positions[$position->getId()]],
+            'data' => ['action' => 'put', 'position' => $this->_positions[$id]],
         ]));
-		$qty = $this->_positions[$position->getId()]->getQuantity();
-		$this->saveToDb($position, $qty);
+		$qty = $this->_positions[$id]->getQuantity();
+		$this->saveToDb($position, $qty, 1 , $wishlist, $wishlist_status);
         $this->saveToSession();
     }
 
-	public function saveToDb($position,$qty, $status=1){
+	public function saveToDb($position,$qty, $status=1, $wishlist=null, $wishlist_status){
 		$erp= self::ID_ERP;
 		$model = new Cart();
+
 		if (!\Yii::$app->user->isGuest) {
 			$id_user = \Yii::$app->user->getId();
-			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user]);
+			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist]);
 		}
 		else {
 			$id_user = null;
-			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id]);
+			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist]);
 		}
 		if($model2) {
 			$model2->qty= $qty;
             $model2->status = $status;
+            $model2->wishlist = $wishlist;
+            $model2->wishlist_status = $wishlist_status;
             if (!$model2->save()) {
                 throw new \Exception('');
             }
@@ -102,6 +119,8 @@ class ShoppingCart extends Component
 			$model->qty = 1;
 			$model->session = Yii::$app->session->id;
 			$model->price = $position->price;
+            $model->wishlist = $wishlist;
+            $model->wishlist_status = $wishlist_status;
 			if (!$model->save()) {
 				throw new \Exception('');
 			}
@@ -112,9 +131,8 @@ class ShoppingCart extends Component
 		$model1 = new Cart();
 		$model = $model1->findAll(['session'=>$session]);
 		if(isset($model)) {
-            //var_dump($model);die();
 			foreach($model as $mods) {
-                $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_erp'=>$mods->id_erp]);
+                $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_erp'=>$mods->id_erp, 'wishlist'=>$mods->wishlist]);
                 if(!is_null($model2)) { //if product is already in user cart
                     $model2->qty = $mods->qty + $model2->qty;
                     $model2->status = 1;

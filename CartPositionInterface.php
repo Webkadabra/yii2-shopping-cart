@@ -8,6 +8,7 @@ namespace yz\shoppingcart;
  * @property int $price
  * @property int $cost
  * @property string $id
+ * @property string $wishlist
  * @property int $quantity
  * @package yz\shoppingcart
  */
@@ -41,4 +42,9 @@ interface CartPositionInterface
      * @return int
      */
     public function getQuantity();
+
+    public function getWishlist();
+
+    public function setWishlist($wishlist);
+
 } 
