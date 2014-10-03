@@ -180,22 +180,26 @@ class ShoppingCart extends Component
      * Removes position from the cart
      * @param CartPositionInterface $position
      */
-    public function remove($position)
+    public function remove($position, $wishlist=null)
     {
-        //var_dump($position);die();
+        if(is_null($wishlist)) {
+            $id= "cart-".$position->getId();
+        }
+        else {
+            $id= "wish-".$position->getId();
+        }
         $erp= self::ID_ERP;
-        //var_dump($this->_positions);die();
-        if(array_key_exists($position->$erp, $this->_positions)) {
+        if(array_key_exists($id, $this->_positions)) {
             $this->trigger(self::EVENT_BEFORE_POSITION_REMOVE, new Event([
-                'data' => $this->_positions[$position->getId()],
+                'data' => $this->_positions[$id],
             ]));
             $this->trigger(self::EVENT_CART_CHANGE, new Event([
-                'data' => ['action' => 'remove', 'position' => $this->_positions[$position->getId()]],
+                'data' => ['action' => 'remove', 'position' => $this->_positions[$id]],
             ]));
-            unset($this->_positions[$position->getId()]);
+            unset($this->_positions[$id]);
             $this->saveToSession();
         }
-        $this->saveToDb($position,0,0);
+        $this->saveToDb($position,0,0,$wishlist,1);
     }
 
     /**
@@ -377,7 +381,7 @@ class ShoppingCart extends Component
     public function getWishlist($name= 'default', $status=1) {
         $models = array();
         if (!\Yii::$app->user->isGuest) {
-            $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => $name, 'wishlist_status' => $status]);
+            $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => $name, 'wishlist_status' => $status, 'status'=>1]);
             return ($models);
         }
         else {
