@@ -188,7 +188,7 @@ class ShoppingCart extends Component
         else {
             $id= "wish-".$position->getId();
         }
-        $erp= self::ID_ERP;
+        //$erp= self::ID_ERP;
         if(array_key_exists($id, $this->_positions)) {
             $this->trigger(self::EVENT_BEFORE_POSITION_REMOVE, new Event([
                 'data' => $this->_positions[$id],
@@ -205,27 +205,53 @@ class ShoppingCart extends Component
     /**
      * Remove all positions
      */
-    public function removeAll()
+    public function removeAll($wishlist=null)
     {
         $erp= self::ID_ERP;
-        //for session- >remove all from session
         $this->loadFromSession();
         $products = $this->_positions;
+        $wishlist_status= 1;
         foreach($products as $p) {
-            $this->saveToDb($p, 0, 0);
+            $this->saveToDb($p, 0, 0,$wishlist, $wishlist_status);
         }
         $this->_positions = [];
+
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'removeAll'],
         ]));
         $this->saveToSession();
 
         // remove all from cart for current user
-        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1]);
+        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
         foreach ($models as $model) {
             $model2 = Product::findOne([$erp=>$model->id_erp]);
             if(!is_null($model2)) {
-                $this->saveToDb($model2, 0, 0);
+                $this->saveToDb($model2, 0, 0, $wishlist, $wishlist_status);
+            }
+        }
+    }
+
+    public function deleteWishlist($wishlist='default') {
+        $erp= self::ID_ERP;
+        $this->loadFromSession();
+        $products = $this->_positions;
+        $wishlist_status= 0;
+        foreach($products as $p) {
+            $this->saveToDb($p, 0, 0,$wishlist, $wishlist_status);
+        }
+        $this->_positions = [];
+
+        $this->trigger(self::EVENT_CART_CHANGE, new Event([
+            'data' => ['action' => 'removeAll'],
+        ]));
+        $this->saveToSession();
+
+        // remove all from cart for current user
+        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
+        foreach ($models as $model) {
+            $model2 = Product::findOne([$erp=>$model->id_erp]);
+            if(!is_null($model2)) {
+                $this->saveToDb($model2, 0, 0, $wishlist, 0);
             }
         }
     }
@@ -256,12 +282,12 @@ class ShoppingCart extends Component
     /**
      * @return CartPositionInterface[]
      */
-    public function getPositions($object=null)
+    public function getPositions($wishlist=null)
     {
         $erp= self::ID_ERP;
         if (!\Yii::$app->user->isGuest) {
             $model= new Cart();
-            $model2 = $model->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$object]);
+            $model2 = $model->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$wishlist]);
             $prod= array();
             foreach($model2 as $model) {
                 $obs = new Product();
@@ -369,8 +395,14 @@ class ShoppingCart extends Component
             $wishlists = array();
             foreach ($models as $mods) {
                 if(in_array($mods->wishlist, $wish)) {
-                    $wishlists[$mods->wishlist][] = $mods;
+                    if ($mods->status == 1) {
+                        $wishlists[$mods->wishlist][] = $mods;
+                    }
+                    else {
+                        $wishlists[$mods->wishlist]=null;
+                    }
                 }
+
             }
             return $wishlists;
         }
