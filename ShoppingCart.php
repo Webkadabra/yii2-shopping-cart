@@ -127,6 +127,7 @@ class ShoppingCart extends Component
 		}
 	}
 	/** save user to db on login for all lines where session = $session */
+    /** @param int $session */
 	public function saveUserToDB($session) { //problema : daca produsul se afla deja in cosul userului, trebuie facuta suma produselor.
 		$model1 = new Cart();
 		$model = $model1->findAll(['session'=>$session]);
@@ -171,7 +172,7 @@ class ShoppingCart extends Component
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'update', 'position' => $this->_positions[$position->getId()]],
         ]));
-        $this->saveToDb($position,$quantity);
+        //$this->saveToDb($position,$quantity);
         $this->saveToSession();
     }
 
@@ -251,13 +252,12 @@ class ShoppingCart extends Component
     /**
      * @return CartPositionInterface[]
      */
-    public function getPositions()
+    public function getPositions($object=null)
     {
         $erp= self::ID_ERP;
-
         if (!\Yii::$app->user->isGuest) {
             $model= new Cart();
-            $model2 = $model->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1]);
+            $model2 = $model->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$object]);
             $prod= array();
             foreach($model2 as $model) {
                 $obs = new Product();
@@ -351,5 +351,34 @@ class ShoppingCart extends Component
     {
         if (isset(Yii::$app->session[$this->cartId]))
             $this->_positions = unserialize(Yii::$app->session[$this->cartId]);
+    }
+
+    public function getAllWishlists($status=1){
+        if (!\Yii::$app->user->isGuest) {
+            $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'wishlist_status'=>$status]);
+            $wish= array();
+            foreach($models as $model) {
+                if (!is_null($model->wishlist)) {
+                    $wish[] = $model->wishlist;
+                }
+            }
+            $wishlists = array();
+            foreach ($models as $mods) {
+                if(in_array($mods->wishlist, $wish)) {
+                    $wishlists[$mods->wishlist][] = $mods;
+                }
+            }
+            return $wishlists;
+        }
+        else {
+            return array();
+        }
+    }
+    public function getWishlist($name, $status=1) {
+        if (!\Yii::$app->user->isGuest) {
+            $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => $name, 'wishlist_status' => $status]);
+            return ($models);
+        }
+
     }
 }
