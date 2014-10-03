@@ -374,9 +374,14 @@ class ShoppingCart extends Component
             return array();
         }
     }
-    public function getWishlist($name, $status=1) {
+    public function getWishlist($name= 'default', $status=1) {
+        $models = array();
         if (!\Yii::$app->user->isGuest) {
             $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => $name, 'wishlist_status' => $status]);
+            return ($models);
+        }
+        else {
+            $models = Cart::findAll(['id_user' =>null, 'wishlist' =>'default', 'wishlist_status' => $status]);
             return ($models);
         }
 
