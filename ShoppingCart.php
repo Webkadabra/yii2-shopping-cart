@@ -152,27 +152,34 @@ class ShoppingCart extends Component
      * @param CartPositionInterface $position
      * @param int $quantity
      */
-    public function update($position, $quantity)
+    public function update($position, $quantity, $wishlist=null)
     {
         if ($quantity <= 0) {
-            $this->remove($position);
-            $this->saveToDb($position,$quantity, $status = 0);
+            $this->remove($position, $wishlist);
+            $this->saveToDb($position,$quantity, $status = 0, $wishlist, 1);
             return;
         }
-        if (isset($this->_positions[$position->getId()])) {
-            $this->_positions[$position->getId()]->setQuantity($quantity);
+        if(is_null($wishlist)) {
+            $id= "cart-".$position->getId();
+        }
+        else {
+            $id= "wish-".$position->getId();
+        }
+        //var_dump($this->_positions);die();
+        if (isset($this->_positions[$id])) {
+            $this->_positions[$id]->setQuantity($quantity);
 
         } else {
             $position->setQuantity($quantity);
-            $this->_positions[$position->getId()] = $position;
+            $this->_positions[$id] = $position;
         }
         $this->trigger(self::EVENT_POSITION_UPDATE, new Event([
             'data' => 464,
         ]));
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'update', 'position' => $this->_positions[$position->getId()]],
+            'data' => ['action' => 'update', 'position' => $this->_positions[$id]],
         ]));
-        //$this->saveToDb($position,$quantity);
+        $this->saveToDb($position,$quantity, 1, $wishlist, 1);
         $this->saveToSession();
     }
 
