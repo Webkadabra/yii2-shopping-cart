@@ -347,19 +347,30 @@ class ShoppingCart extends Component
      * @param $withDiscount
      * @return int
      */
+    //TODO ce facem in cazul in care produsul a fost adaugat in cos, si intre timp a fost modificat???
     public function getCost($withDiscount = false)
     {
+        //$id_erp=self::ID_ERP;
         $cost = 0;
-        foreach ($this->_positions as $position) {
-            $cost += $position->getCost($withDiscount);
+        if (\Yii::$app->user->isGuest) {
+            foreach ($this->_positions as $position) {
+                $cost += $position->getCost($withDiscount);
+            }
+            $costEvent = new CostCalculationEvent([
+                'baseCost' => $cost,
+            ]);
+            $this->trigger(self::EVENT_COST_CALCULATION, $costEvent);
+            if ($withDiscount)
+                $cost -= $costEvent->discountValue;
+            return $cost;
         }
-        $costEvent = new CostCalculationEvent([
-            'baseCost' => $cost,
-        ]);
-        $this->trigger(self::EVENT_COST_CALCULATION, $costEvent);
-        if ($withDiscount)
-            $cost -= $costEvent->discountValue;
-        return $cost;
+        else {
+            $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>null]);
+            foreach ($models as $model) {
+                $cost += $model->price * $model->qty;
+            }
+            return $cost;
+        }
     }
 
     /**
