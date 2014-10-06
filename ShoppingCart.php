@@ -422,4 +422,53 @@ class ShoppingCart extends Component
         }
 
     }
+    public static function createWishlist($name) {
+        $exists = Cart::findAll(['wishlist'=>$name, 'wishlist_status'=>1, 'id_user'=>Yii::$app->user->getId()]);
+        if(count($exists) == 0 ) {
+            $cart = new Cart();
+            $cart->session = Yii::$app->session->id;
+            $cart->id_user = Yii::$app->user->getId();
+            $cart->status = 0;
+            $cart->wishlist = $name;
+            $cart->wishlist_status = 1;
+            $cart->save();
+            return $cart;
+        }
+        else {
+            return 'wishlist '.$name .' already exists';
+        }
+    }
+    public static function renameWishlist($name, $newName) {
+        if (!\Yii::$app->user->isGuest) {
+            $exists = Cart::findAll(['wishlist' => $name, 'wishlist_status' => 1, 'id_user' => \Yii::$app->user->getId()]);
+            if (count($exists) != 0) {
+                foreach ($exists as $wish) {
+                    $wish->wishlist = $newName;
+                    $wish->save();
+                }
+                return true;
+            } else {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+    public static function moveProdFromWishlist($product,$wishlist, $newWishlist) {
+        if (!\Yii::$app->user->isGuest) {
+            $wish = Cart::findOne(['id_erp'=>$product, 'wishlist'=>$wishlist, 'wishlist_status'=>1, 'id_user'=>\Yii::$app->user->getId()]);
+            if(!is_null($wish)) {
+                $wish->wishlist = $newWishlist;
+                $wish->save();
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
 }
