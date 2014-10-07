@@ -317,10 +317,12 @@ class ShoppingCart extends Component
             $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => $name, 'wishlist_status' => $status, 'status'=>1]);
             if(!is_null($models)) {
                 foreach($models as $model) {
-                    $obs = new Product();
-                    $obs = $obs->findOne([$erp=>$model->id_erp]);
-                    $prod[$model->id_erp] = $obs;
-                    $prod[$model->id_erp]->quantity = $model->qty;
+                    if (!is_null($model->id_erp)) {
+                        $obs = new Product();
+                        $obs = $obs->findOne([$erp => $model->id_erp]);
+                        $prod[$model->id_erp] = $obs;
+                        $prod[$model->id_erp]->quantity = $model->qty;
+                    }
                 }
                 return $prod;
             }
@@ -448,15 +450,13 @@ class ShoppingCart extends Component
             $wishlists = array();
             foreach ($models as $mods) {
                 if(in_array($mods->wishlist, $wish)) {
-                    if ($mods->status == 1) {
+                    if ($mods->status == 1 && !is_null($mods->id_erp)) {
                         $wishlists[$mods->wishlist][] = $mods;
                     }
                 }
             }
             foreach ($models as $empty) {
                 if (!array_key_exists($empty->wishlist, $wishlists) && !is_null($empty->wishlist)) {
-                    //var_dump($empty->wishlist);
-
                     $wishlists[$empty->wishlist]=null;
                 }
             }
