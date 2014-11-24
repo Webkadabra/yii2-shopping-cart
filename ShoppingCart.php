@@ -428,7 +428,8 @@ class ShoppingCart extends Component
     protected function saveToSession()
     {
         Yii::$app->session[$this->cartId] = serialize($this->_positions);
-        //var_dump(Yii::$app->session[$this->cartId]);
+        var_dump($this->_positions);
+        var_dump(Yii::$app->session[$this->cartId]);
         //die();
     }
 
