@@ -331,7 +331,7 @@ class ShoppingCart extends Component
             }
         }
         else {
-            $models = Cart::findAll(['id_user' =>null, 'wishlist' =>'default', 'session'=>Yii::$app->session->id,'wishlist_status' => $status]);
+            $models = Cart::findAll(['id_user' =>null, 'wishlist' =>'default', 'session'=>Yii::$app->session->id,'wishlist_status' => $status, 'status'=>1]);
             if(!is_null($models)) {
                 foreach($models as $model) {
                     $obs = new Product();
