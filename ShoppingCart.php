@@ -32,8 +32,8 @@ class ShoppingCart extends Component
     /** Triggered on after cart cost calculation */
     const EVENT_COST_CALCULATION = 'costCalculation';
 
-	/** To define de primary key from product model */
-	const ID_ERP = 'remote_id_charisma';
+    /** To define de primary key from product model */
+    const ID_ERP = 'remote_id_charisma';
 
     /**
      * Shopping cart ID to support multiple carts
@@ -61,6 +61,7 @@ class ShoppingCart extends Component
     //todo scoatem wishlist_status????
     public function put($position, $quantity = 1, $wishlist, $wishlist_status=1) //scoatem wishlist_status????
     {
+
         if(is_null($wishlist)) {
             $id= "cart-".$position->getId();
         }
@@ -87,51 +88,51 @@ class ShoppingCart extends Component
         $this->trigger(self::EVENT_CART_CHANGE, new Event([
             'data' => ['action' => 'put', 'position' => $this->_positions[$id]],
         ]));
-		$qty = $this->_positions[$id]->getQuantity();
-		$this->saveToDb($position, $qty, 1 , $wishlist, $wishlist_status);
+        $qty = $this->_positions[$id]->getQuantity();
+        $this->saveToDb($position, $qty, 1 , $wishlist, $wishlist_status);
         $this->saveToSession();
     }
 
-	public function saveToDb($position,$qty, $status=1, $wishlist=null, $wishlist_status){
-		$erp= self::ID_ERP;
-		$model = new Cart();
-		if (!\Yii::$app->user->isGuest) {
-			$id_user = \Yii::$app->user->getId();
-			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist]);
-		}
-		else {
-			$id_user = null;
-			$model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist]);
-		}
-		if($model2) {
-			$model2->qty = $qty;
+    public function saveToDb($position,$qty, $status=1, $wishlist=null, $wishlist_status){
+        $erp= self::ID_ERP;
+        $model = new Cart();
+        if (!\Yii::$app->user->isGuest) {
+            $id_user = \Yii::$app->user->getId();
+            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist]);
+        }
+        else {
+            $id_user = null;
+            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist]);
+        }
+        if($model2) {
+            $model2->qty = $qty;
             $model2->status = $status;
             $model2->wishlist = $wishlist;
             $model2->wishlist_status = $wishlist_status;
             if (!$model2->save()) {
                 throw new \Exception('');
             }
-		}
-		else {
+        }
+        else {
             $model->id_user = $id_user;
-			$model->id_erp = $position->$erp;
-			$model->qty = $qty;
-			$model->session = Yii::$app->session->id;
-			$model->price = $position->price;
+            $model->id_erp = $position->$erp;
+            $model->qty = $qty;
+            $model->session = Yii::$app->session->id;
+            $model->price = $position->price;
             $model->wishlist = $wishlist;
             $model->wishlist_status = $wishlist_status;
-			if (!$model->save()) {
-				throw new \Exception('');
-			}
-		}
-	}
-	/** save user to db on login for all lines where session = $session */
+            if (!$model->save()) {
+                throw new \Exception('');
+            }
+        }
+    }
+    /** save user to db on login for all lines where session = $session */
     /** @param int $session */
-	public function saveUserToDB($session) { //problema : daca produsul se afla deja in cosul userului, trebuie facuta suma produselor.
-		$model1 = new Cart();
-		$model = $model1->findAll(['session'=>$session]);
-		if(isset($model)) {
-			foreach($model as $mods) {
+    public function saveUserToDB($session) { //problema : daca produsul se afla deja in cosul userului, trebuie facuta suma produselor.
+        $model1 = new Cart();
+        $model = $model1->findAll(['session'=>$session]);
+        if(isset($model)) {
+            foreach($model as $mods) {
                 $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_erp'=>$mods->id_erp, 'wishlist'=>$mods->wishlist]);
                 if(!is_null($model2)) { //if product is already in user cart
                     $model2->qty = $mods->qty + $model2->qty;
@@ -143,11 +144,11 @@ class ShoppingCart extends Component
                     $mods->id_user = Yii::$app->user->getId();
                     $mods->save();
                 }
-			}
-		}
-	}
+            }
+        }
+    }
 
-	/**
+    /**
      * @param CartPositionInterface $position
      * @param int $quantity
      */
@@ -292,21 +293,18 @@ class ShoppingCart extends Component
     {
         $erp= self::ID_ERP;
         if (!\Yii::$app->user->isGuest) {
-            $model= new Cart();
-            $model2 = $model->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$wishlist]);
-            $prod= array();
-            foreach($model2 as $model) {
-                $obs = new Product();
-                $obs = $obs->findOne([$erp=>$model->id_erp]);
-                $prod[$model->id_erp] = $obs;
-                $prod[$model->id_erp]->quantity = $model->qty;
-
-            }
-            return $prod;
+            $model2 = (new Cart())->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$wishlist]);
         }
         else {
-            return $this->_positions;
+            $model2 = (new Cart())->findAll(['id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1,'wishlist'=>$wishlist]);
         }
+        $prod= array();
+        foreach($model2 as $model) {
+            $obs = (new Product())->findOne([$erp=>$model->id_erp]);
+            $prod[$model->id_erp] = $obs;
+            $prod[$model->id_erp]->quantity = $model->qty;
+        }
+        return $prod;
     }
 
     public function getWishlist($name= 'default', $status=1) {
