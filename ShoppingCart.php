@@ -61,7 +61,6 @@ class ShoppingCart extends Component
     //todo scoatem wishlist_status????
     public function put($position, $quantity = 1, $wishlist, $wishlist_status=1) //scoatem wishlist_status????
     {
-
         if(is_null($wishlist)) {
             $id= "cart-".$position->getId();
         }
@@ -94,15 +93,16 @@ class ShoppingCart extends Component
     }
 
     public function saveToDb($position,$qty, $status=1, $wishlist=null, $wishlist_status){
+        $website = Yii::$app->params['website'];
         $erp= self::ID_ERP;
         $model = new Cart();
         if (!\Yii::$app->user->isGuest) {
             $id_user = \Yii::$app->user->getId();
-            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist]);
+            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist, 'website'=>$website]);
         }
         else {
             $id_user = null;
-            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist]);
+            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist, 'website'=>$website]);
         }
         if($model2) {
             $model2->qty = $qty;
@@ -121,6 +121,7 @@ class ShoppingCart extends Component
             $model->price = $position->price;
             $model->wishlist = $wishlist;
             $model->wishlist_status = $wishlist_status;
+            $model->website = $website;
             if (!$model->save()) {
                 throw new \Exception('');
             }
