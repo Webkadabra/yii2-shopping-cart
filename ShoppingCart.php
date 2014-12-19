@@ -126,7 +126,8 @@ class ShoppingCart extends Component
             $model->wishlist_status = $wishlist_status;
             $model->website = $website;
             if (!$model->save()) {
-                throw new \Exception('');
+                var_dump($model->getErrors());
+                die();
             }
         }
     }
@@ -392,6 +393,9 @@ class ShoppingCart extends Component
     {
         //$id_erp=self::ID_ERP;
         $cost = 0;
+        $totalCost=0;
+        $totalDiscount=0;
+        $totalCostNoDiscount = 0;
         if (\Yii::$app->user->isGuest) {
             foreach ($this->_positions as $position) {
                 $cost += $position->getCost($withDiscount);
@@ -407,9 +411,19 @@ class ShoppingCart extends Component
         else {
             $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>$wishlist]);
             foreach ($models as $model) {
-                $cost += $model->price * $model->qty;
+                $price = $model->price;
+                if (!is_null($model->discounted_price)){
+                    $price = $model->discounted_price;
+                    $totalDiscount += ($model->price - $model->discounted_price)*$model->qty;
+                }
+                $totalCost += $price * $model->qty;
+                $totalCostNoDiscount +=$model->price *$model->qty;
             }
-            return $cost;
+            return [
+                'totalCost'=>$totalCost,
+                'totalDiscount'=>$totalDiscount,
+                'totalCostNoDiscount'=>$totalCostNoDiscount,
+            ];
         }
     }
 
