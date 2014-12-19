@@ -107,6 +107,8 @@ class ShoppingCart extends Component
         if($model2) {
             $model2->qty = $qty;
             $model2->status = $status;
+            $model2->discounted_price = $position->discountPrice;
+            $model2->price=$position->price;
             $model2->wishlist = $wishlist;
             $model2->wishlist_status = $wishlist_status;
             if (!$model2->save()) {
@@ -118,6 +120,7 @@ class ShoppingCart extends Component
             $model->id_erp = $position->$erp;
             $model->qty = $qty;
             $model->session = Yii::$app->session->id;
+            $model->discounted_price = $position->discountPrice;
             $model->price = $position->price;
             $model->wishlist = $wishlist;
             $model->wishlist_status = $wishlist_status;
