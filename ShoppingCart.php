@@ -326,6 +326,7 @@ class ShoppingCart extends Component
                         $obs = $obs->findOne([$erp => $model->id_erp]);
                         $prod[$model->id_erp] = $obs;
                         $prod[$model->id_erp]->quantity = $model->qty;
+                        $prod[$model->id_erp]->discountPrice = $model->discounted_price;
                     }
                 }
                 return $prod;
@@ -342,6 +343,7 @@ class ShoppingCart extends Component
                     $obs = $obs->findOne([$erp=>$model->id_erp]);
                     $prod[$model->id_erp] = $obs;
                     $prod[$model->id_erp]->quantity = $model->qty;
+                    $prod[$model->id_erp]->discountPrice = $model->discounted_price;
                 }
                 return $prod;
             }
