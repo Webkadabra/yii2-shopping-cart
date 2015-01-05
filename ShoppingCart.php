@@ -423,7 +423,7 @@ class ShoppingCart extends Component
                 }
                 $totalCost += $price * $model->qty;
                 $totalCostNoDiscount +=$model->price *$model->qty;
-                $totalNet += Vat::removeVat($price, $vat);
+                $totalNet += Vat::removeVat($price, $vat) * $model->qty;
             }
             return [
                 'totalCost'=>$totalCost,
