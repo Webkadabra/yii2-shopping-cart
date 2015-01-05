@@ -2,6 +2,7 @@
 
 namespace yz\shoppingcart;
 
+use common\components\Vat;
 use frontend\models\Product;
 use yii\base\Component;
 use yii\base\Event;
@@ -396,6 +397,7 @@ class ShoppingCart extends Component
         //$id_erp=self::ID_ERP;
         $cost = 0;
         $totalCost=0;
+        $totalNet = 0;
         $totalDiscount=0;
         $totalCostNoDiscount = 0;
         if (\Yii::$app->user->isGuest) {
@@ -414,17 +416,20 @@ class ShoppingCart extends Component
             $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>$wishlist]);
             foreach ($models as $model) {
                 $price = $model->price;
+                $vat = Product::findOne(['remote_id_charisma'=>$model->id_erp])->vat;
                 if (!is_null($model->discounted_price)){
                     $price = $model->discounted_price;
                     $totalDiscount += ($model->price - $model->discounted_price)*$model->qty;
                 }
                 $totalCost += $price * $model->qty;
                 $totalCostNoDiscount +=$model->price *$model->qty;
+                $totalNet += Vat::removeVat($price, $vat);
             }
             return [
                 'totalCost'=>$totalCost,
                 'totalDiscount'=>$totalDiscount,
                 'totalCostNoDiscount'=>$totalCostNoDiscount,
+                'totalNet'=>$totalNet,
             ];
         }
     }
