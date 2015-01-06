@@ -5,9 +5,11 @@ namespace yz\shoppingcart;
 use common\components\Vat;
 use frontend\models\Product;
 use yii\base\Component;
+use yii\base\ErrorException;
 use yii\base\Event;
 use Yii;
 use frontend\models\Cart;
+use yii\db\Exception;
 
 
 /**
@@ -69,10 +71,8 @@ class ShoppingCart extends Component
             $id= "wish-".$position->getId();
         }
         if (isset($this->_positions[$id])) {
-            $this->_positions[$id]->
-            setQuantity($this->_positions[$id]->getQuantity() + $quantity);
-            $this->_positions[$id]->
-            setWishlist($this->_positions[$id]->getWishlist());
+            $this->_positions[$id]->setQuantity($this->_positions[$id]->getQuantity() + $quantity);
+            $this->_positions[$id]->setWishlist($this->_positions[$id]->getWishlist());
         } else {
             $position->setQuantity($quantity);
             $this->_positions[$id] = $position;
@@ -94,43 +94,38 @@ class ShoppingCart extends Component
     }
 
     public function saveToDb($position,$qty, $status=1, $wishlist=null, $wishlist_status){
+
         $website = Yii::$app->params['website'];
         $erp= self::ID_ERP;
-        $model = new Cart();
         if (!\Yii::$app->user->isGuest) {
             $id_user = \Yii::$app->user->getId();
-            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist, 'website'=>$website]);
+            $cart = Cart::findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist, 'website'=>$website]);
         }
         else {
             $id_user = null;
-            $model2 = $model->findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist, 'website'=>$website]);
+            $cart = Cart::findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist, 'website'=>$website]);
         }
-        if($model2) {
-            $model2->qty = $qty;
-            $model2->status = $status;
-            $model2->discounted_price = $position->discountPrice;
-            $model2->price=$position->price;
-            $model2->wishlist = $wishlist;
-            $model2->wishlist_status = $wishlist_status;
-            if (!$model2->save()) {
-                throw new \Exception('');
-            }
+
+        if (is_null($cart))
+            $cart = new Cart();
+
+        $cart->session  = Yii::$app->session->id;
+        $cart->id_user  = $id_user;
+        $cart->id_erp   = $position->$erp;
+        $cart->qty      = $qty;
+        $cart->price    = $position->price;
+        $cart->old_price = $position->oldPrice;
+        $cart->discounted_price = $position->discountPrice;
+        $cart->status   = $status;
+        $cart->wishlist = $wishlist;
+        $cart->wishlist_status = $wishlist_status;
+        $cart->website  = $website;
+
+        if (!$cart->save()) {
+            throw new Exception('Could not save cart data', $cart->getErrors());
         }
-        else {
-            $model->id_user = $id_user;
-            $model->id_erp = $position->$erp;
-            $model->qty = $qty;
-            $model->session = Yii::$app->session->id;
-            $model->discounted_price = $position->discountPrice;
-            $model->price = $position->price;
-            $model->wishlist = $wishlist;
-            $model->wishlist_status = $wishlist_status;
-            $model->website = $website;
-            if (!$model->save()) {
-                var_dump($model->getErrors());
-                die();
-            }
-        }
+//        var_dump('xxxxxxxxx', $cart->id );
+
     }
     /** save user to db on login for all lines where session = $session */
     /** @param int $session */
@@ -174,7 +169,6 @@ class ShoppingCart extends Component
         //var_dump($this->_positions);die();
         if (isset($this->_positions[$id])) {
             $this->_positions[$id]->setQuantity($quantity);
-
         } else {
             $position->setQuantity($quantity);
             $this->_positions[$id] = $position;
@@ -222,7 +216,7 @@ class ShoppingCart extends Component
     {
         $erp= self::ID_ERP;
         $this->loadFromSession();
-        $products = $this->_positions;
+        $products = $this->getPositions();
         $wishlist_status= 1;
         foreach($products as $p) {
             $this->saveToDb($p, 0, 0,$wishlist, $wishlist_status);
