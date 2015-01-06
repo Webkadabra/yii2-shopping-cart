@@ -95,7 +95,6 @@ class ShoppingCart extends Component
 
     public function saveToDb($position,$qty, $status=1, $wishlist=null, $wishlist_status){
 
-
         $website = Yii::$app->params['website'];
         $erp= self::ID_ERP;
         if (!\Yii::$app->user->isGuest) {
@@ -110,8 +109,6 @@ class ShoppingCart extends Component
         if (is_null($cart))
             $cart = new Cart();
 
-
-
         $cart->session  = Yii::$app->session->id;
         $cart->id_user  = $id_user;
         $cart->id_erp   = $position->$erp;
@@ -122,11 +119,12 @@ class ShoppingCart extends Component
         $cart->status   = $status;
         $cart->wishlist = $wishlist;
         $cart->wishlist_status = $wishlist_status;
+        $cart->website  = $website;
 
         if (!$cart->save()) {
-            throw new Exception('Could not save cart data');
+            throw new Exception('Could not save cart data', $cart->getErrors());
         }
-
+//        var_dump('xxxxxxxxx', $cart->id );
 
     }
     /** save user to db on login for all lines where session = $session */
@@ -171,7 +169,6 @@ class ShoppingCart extends Component
         //var_dump($this->_positions);die();
         if (isset($this->_positions[$id])) {
             $this->_positions[$id]->setQuantity($quantity);
-
         } else {
             $position->setQuantity($quantity);
             $this->_positions[$id] = $position;
