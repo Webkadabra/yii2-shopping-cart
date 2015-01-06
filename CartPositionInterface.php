@@ -17,6 +17,8 @@ interface CartPositionInterface
     /** Triggered on cost calculation */
     const EVENT_COST_CALCULATION = 'costCalculation';
 
+    // test
+
     /**
      * @return integer
      */

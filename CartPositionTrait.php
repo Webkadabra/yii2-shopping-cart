@@ -14,6 +14,7 @@ use yii\base\Model;
 trait CartPositionTrait
 {
     protected $_quantity;
+    protected $_oldPrice;
     protected $_wishlist;
 
     public function getQuantity()
@@ -34,6 +35,16 @@ trait CartPositionTrait
     public function setWishlist($wishlist)
     {
         $this->_wishlist = $wishlist;
+    }
+
+    public function getOldPrice()
+    {
+        return $this->_oldPrice;
+    }
+
+    public function setOldPrice($price)
+    {
+        $this->_oldPrice = $price;
     }
 
     /**
