@@ -299,10 +299,10 @@ class ShoppingCart extends Component
     {
         $erp= self::ID_ERP;
         if (!\Yii::$app->user->isGuest) {
-            $model2 = (new Cart())->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$wishlist]);
+            $model2 = (new Cart())->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$wishlist, 'website'=>Yii::$app->params['website']]);
         }
         else {
-            $model2 = (new Cart())->findAll(['id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1,'wishlist'=>$wishlist]);
+            $model2 = (new Cart())->findAll(['id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1,'wishlist'=>$wishlist, 'website'=>Yii::$app->params['website']]);
         }
         $prod= array();
         foreach($model2 as $model) {
