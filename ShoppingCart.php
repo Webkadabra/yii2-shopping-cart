@@ -93,40 +93,51 @@ class ShoppingCart extends Component
         $this->saveToSession();
     }
 
-    public function saveToDb($position,$qty, $status=1, $wishlist=null, $wishlist_status){
+    /**
+     * @param CartPositionInterface $position
+     * @param int                   $qty
+     * @param int                   $status
+     * @param int                   $wishlist
+     * @param string                $wishlist_status
+     *
+     * @throws Exception
+     */
+    public function saveToDb($position, $qty, $status = 1, $wishlist = null, $wishlist_status) {
 
         $website = Yii::$app->params['website'];
-        $erp= self::ID_ERP;
-        if (!\Yii::$app->user->isGuest) {
-            $id_user = \Yii::$app->user->getId();
-            $cart = Cart::findOne(['id_erp'=>$position->$erp, 'id_user'=>$id_user, 'wishlist'=>$wishlist, 'website'=>$website]);
-        }
-        else {
-            $id_user = null;
-            $cart = Cart::findOne(['id_erp'=>$position->$erp, 'session'=>Yii::$app->session->id,'wishlist'=>$wishlist, 'website'=>$website]);
-        }
+        $erp = self::ID_ERP;
 
-        if (is_null($cart))
-            $cart = new Cart();
+        if (Yii::$app->user->getIsGuest())
+            $searchCriteria = ['id_erp' => $position->$erp, 'session' => Yii::$app->session->id,
+                               'wishlist' => $wishlist, 'website' => $website];
+        else
+            $searchCriteria = ['id_erp' => $position->$erp, 'id_user' => Yii::$app->user->getId(),
+                               'wishlist' => $wishlist,
+                               'website' => $website];
 
-        $cart->session  = Yii::$app->session->id;
-        $cart->id_user  = $id_user;
-        $cart->id_erp   = $position->$erp;
-        $cart->qty      = $qty;
-        $cart->price    = $position->price;
-        $cart->old_price = $position->oldPrice;
-        $cart->discounted_price = $position->discountPrice;
-        $cart->status   = $status;
-        $cart->wishlist = $wishlist;
-        $cart->wishlist_status = $wishlist_status;
-        $cart->website  = $website;
+        //  if we cant find a cart item we gonna assume it's a new record
+        if (!$cartItem = Cart::findOne($searchCriteria))
+            $cartItem = new Cart();
 
-        if (!$cart->save()) {
-            throw new Exception('Could not save cart data', $cart->getErrors());
+        $cartItem->session = Yii::$app->session->id;
+        $cartItem->id_user = Yii::$app->user->isGuest ? null : Yii::$app->user->getId();
+        $cartItem->id_erp = $position->$erp;
+        $cartItem->qty = $qty;
+        $cartItem->price = $position->price;
+        $cartItem->old_price = $position->oldPrice;
+        $cartItem->discounted_price = $position->discountPrice;
+        $cartItem->status = $status;
+        $cartItem->wishlist = $wishlist;
+        $cartItem->wishlist_status = $wishlist_status;
+        $cartItem->website = $website;
+
+        if (!$cartItem->save()) {
+            throw new Exception('Could not save cart data', $cartItem->getErrors());
         }
-//        var_dump('xxxxxxxxx', $cart->id );
 
     }
+
+
     /** save user to db on login for all lines where session = $session */
     /** @param int $session */
     public function saveUserToDB($session) { //problema : daca produsul se afla deja in cosul userului, trebuie facuta suma produselor.
