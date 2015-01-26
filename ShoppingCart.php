@@ -312,9 +312,11 @@ class ShoppingCart extends Component
         $prod= array();
         foreach($model2 as $model) {
             $obs = (new Product())->findOne([$erp=>$model->id_erp]);
-            $prod[$model->id_erp] = $obs;
-            $prod[$model->id_erp]->quantity = $model->qty;
-            $prod[$model->id_erp]->discountPrice = $model->discounted_price;
+            if (!is_null($obs)){
+                $obs->quantity = $model->qty;
+                $obs->discountPrice = $model->discounted_price;
+                $prod[$model->id_erp] = $obs;
+            }
         }
         return $prod;
     }
