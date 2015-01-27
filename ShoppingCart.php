@@ -423,7 +423,10 @@ class ShoppingCart extends Component
             $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>$wishlist]);
             foreach ($models as $model) {
                 $price = $model->price;
-                $vat = Product::findOne(['remote_id_charisma'=>$model->id_erp])->vat;
+                if ($product = Product::findOne(['remote_id_charisma'=>$model->id_erp]))
+                    $vat = $product->vat;
+                else
+                    continue;
                 if (!is_null($model->discounted_price)){
                     $price = $model->discounted_price;
                     $totalDiscount += ($model->price - $model->discounted_price)*$model->qty;
