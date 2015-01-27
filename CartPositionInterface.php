@@ -5,11 +5,11 @@ namespace yz\shoppingcart;
 
 /**
  * Interface CartItemInterface
- * @property int $price
- * @property int $cost
+ * @property int    $price
+ * @property int    $cost
  * @property string $id
  * @property string $wishlist
- * @property int $quantity
+ * @property int    $quantity
  * @package yz\shoppingcart
  */
 interface CartPositionInterface
@@ -26,6 +26,7 @@ interface CartPositionInterface
 
     /**
      * @param bool $withDiscount
+     *
      * @return integer
      */
     public function getCost($withDiscount = true);
@@ -45,8 +46,28 @@ interface CartPositionInterface
      */
     public function getQuantity();
 
+    /**
+     * @return mixed
+     */
     public function getWishlist();
 
+    /**
+     * @param string $wishlist
+     *
+     * @return mixed
+     */
     public function setWishlist($wishlist);
+
+    /**
+     * @return mixed
+     */
+    public function getOldPrice();
+
+    /**
+     * @param string $price
+     *
+     * @return mixed
+     */
+    public function setOldPrice($price);
 
 } 

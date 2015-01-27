@@ -6,9 +6,10 @@ use yii\base\Model;
 
 /**
  * Trait CartPositionTrait
- * @property int $quantity Returns quantity of cart position
+ * @property int    $quantity Returns quantity of cart position
  * @property string $wishlist Returns wishlist value
- * @property int $cost Returns cost of cart position. Default value is 'price * quantity'
+ * @property int    $cost     Returns cost of cart position. Default value is 'price * quantity'
+ * @property int    $oldPrice Item price from previous order
  * @package yz\shoppingcart
  */
 trait CartPositionTrait
@@ -17,43 +18,56 @@ trait CartPositionTrait
     protected $_oldPrice;
     protected $_wishlist;
 
-    public function getQuantity()
-    {
+    /**
+     * @return int
+     */
+    public function getQuantity() {
         return $this->_quantity;
     }
 
-    public function setQuantity($quantity)
-    {
+    /**
+     * @param int $quantity
+     */
+    public function setQuantity($quantity) {
         $this->_quantity = $quantity;
     }
 
-    public function getWishlist()
-    {
+    /**
+     * @return string
+     */
+    public function getWishlist() {
         return $this->_wishlist;
     }
 
-    public function setWishlist($wishlist)
-    {
+    /**
+     * @param string $wishlist
+     */
+    public function setWishlist($wishlist) {
         $this->_wishlist = $wishlist;
     }
 
-    public function getOldPrice()
-    {
+    /**
+     * @return int
+     */
+    public function getOldPrice() {
         return $this->_oldPrice;
     }
 
-    public function setOldPrice($price)
-    {
+    /**
+     * @param int $price
+     */
+    public function setOldPrice($price) {
         $this->_oldPrice = $price;
     }
 
     /**
      * Default implementation for getCost function. Cost is calculated as price * quantity
+     *
      * @param bool $withDiscount
+     *
      * @return int
      */
-    public function getCost($withDiscount = true)
-    {
+    public function getCost($withDiscount = true) {
         /** @var Model|CartPositionInterface|self $this */
         $cost = $this->getQuantity() * $this->getPrice();
         $costEvent = new CostCalculationEvent([
