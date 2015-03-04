@@ -3,6 +3,7 @@
 namespace yz\shoppingcart;
 
 use common\components\Vat;
+use common\models\ProductBulkOffer;
 use frontend\models\Product;
 use yii\base\Component;
 use yii\base\ErrorException;
@@ -107,25 +108,40 @@ class ShoppingCart extends Component
         $website = Yii::$app->params['website'];
         $erp = self::ID_ERP;
 
-        if (Yii::$app->user->getIsGuest())
+        if (Yii::$app->user->getIsGuest()) {
             $searchCriteria = ['id_erp' => $position->$erp, 'session' => Yii::$app->session->id,
-                               'wishlist' => $wishlist, 'website' => $website];
-        else
+                'wishlist' => $wishlist, 'website' => $website];
+        } else {
             $searchCriteria = ['id_erp' => $position->$erp, 'id_user' => Yii::$app->user->getId(),
-                               'wishlist' => $wishlist,
-                               'website' => $website];
+                'wishlist' => $wishlist,
+                'website' => $website];
+        }
 
         //  if we cant find a cart item we gonna assume it's a new record
-        if (!$cartItem = Cart::findOne($searchCriteria))
+        if (!$cartItem = Cart::findOne($searchCriteria)) {
             $cartItem = new Cart();
-
+        }
+        $price = $position->discountPrice;
+        $bulks = ProductBulkOffer::findAll(['id_erp'=>$position->$erp, 'id_website'=>$website]);
+        $lastMax=0;
+        $lastMaxPercent=0;
+        foreach ($bulks as $bulk) {
+            $lastMax = $bulk->max;
+            $lastMaxPercent = $bulk->percent;
+            if ($qty >= $bulk->min && $qty < $bulk->max) {
+                $price = $position->discountPrice - $position->discountPrice * $bulk->percent;
+            } elseif ($qty >= $lastMax) {
+                $price = $position->discountPrice - $position->discountPrice * $lastMaxPercent;
+            }
+        }
         $cartItem->session = Yii::$app->session->id;
         $cartItem->id_user = Yii::$app->user->isGuest ? null : Yii::$app->user->getId();
         $cartItem->id_erp = $position->$erp;
         $cartItem->qty = $qty;
         $cartItem->price = $position->price;
         $cartItem->old_price = $position->oldPrice;
-        $cartItem->discounted_price = $position->discountPrice;
+        //$cartItem->discounted_price = $position->discountPrice;
+        $cartItem->discounted_price = $price;
         $cartItem->status = $status;
         $cartItem->wishlist = $wishlist;
         $cartItem->wishlist_status = $wishlist_status;
