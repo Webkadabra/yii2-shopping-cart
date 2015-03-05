@@ -128,10 +128,14 @@ class ShoppingCart extends Component
         foreach ($bulks as $bulk) {
             $lastMax = $bulk->max;
             $lastMaxPercent = $bulk->percent;
+            $dPrice = $price;
+            if (is_null($position->discountPrice)) {
+                $dPrice = $position->price;
+            }
             if ($qty >= $bulk->min && $qty < $bulk->max) {
-                $price = $position->discountPrice - $position->discountPrice * $bulk->percent;
+                $price = $dPrice - $dPrice * $bulk->percent;
             } elseif ($qty >= $lastMax) {
-                $price = $position->discountPrice - $position->discountPrice * $lastMaxPercent;
+                $price = $dPrice - $dPrice * $lastMaxPercent;
             }
         }
         $cartItem->session = Yii::$app->session->id;
