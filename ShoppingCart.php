@@ -408,9 +408,17 @@ class ShoppingCart extends Component
     public function getCount()
     {
         $count = 0;
-        foreach ($this->_positions as $position)
-            $count += $position->getQuantity();
-        return $count;
+        if (!\Yii::$app->user->isGuest) {
+            $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => null, 'status' => 1, 'website'=>Yii::$app->params['website']]);
+            foreach ($models as $model) {
+                $count += $model->qty;
+            }
+            return $count;
+        } else {
+            foreach ($this->_positions as $position)
+                $count += $position->getQuantity();
+            return $count;
+        }
     }
 
     /**
