@@ -2,6 +2,7 @@
 
 namespace yz\shoppingcart;
 
+use backend\controllers\CartController;
 use common\components\Vat;
 use common\models\ProductBulkOffer;
 use frontend\models\Product;
