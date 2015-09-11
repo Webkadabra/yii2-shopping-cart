@@ -64,7 +64,7 @@ class ShoppingCart extends Component
      * @param int $quantity
      */
     //todo scoatem wishlist_status????
-    public function put($position, $quantity = 1, $wishlist, $wishlist_status=1) //scoatem wishlist_status????
+    public function put($position, $quantity = 1, $wishlist = null, $wishlist_status=1) //scoatem wishlist_status????
     {
         if(is_null($wishlist)) {
             $id= "cart-".$position->getId();
@@ -110,10 +110,10 @@ class ShoppingCart extends Component
         $erp = self::ID_ERP;
 
         if (Yii::$app->user->getIsGuest()) {
-            $searchCriteria = ['id_erp' => $position->$erp, 'session' => Yii::$app->session->id,
+            $searchCriteria = ['id_product' => $position->id, 'session' => Yii::$app->session->id,
                 'wishlist' => $wishlist, 'website' => $website];
         } else {
-            $searchCriteria = ['id_erp' => $position->$erp, 'id_user' => Yii::$app->user->getId(),
+            $searchCriteria = ['id_product' => $position->id, 'id_user' => Yii::$app->user->getId(),
                 'wishlist' => $wishlist,
                 'website' => $website];
         }
@@ -123,7 +123,7 @@ class ShoppingCart extends Component
             $cartItem = new Cart();
         }
         $price = $position->discountPrice;
-        $bulks = ProductBulkOffer::findAll(['id_erp'=>$position->$erp, 'id_website'=>$website]);
+        $bulks = ProductBulkOffer::findAll(['id_product'=>$position->id, 'id_website'=>$website]);
         $lastMax=0;
         $lastMaxPercent=0;
         foreach ($bulks as $bulk) {
@@ -141,6 +141,7 @@ class ShoppingCart extends Component
         }
         $cartItem->session = Yii::$app->session->id;
         $cartItem->id_user = Yii::$app->user->isGuest ? null : Yii::$app->user->getId();
+        $cartItem->id_product = $position->id;
         $cartItem->id_erp = $position->$erp;
         $cartItem->qty = $qty;
         $cartItem->price = $position->price;
@@ -166,7 +167,7 @@ class ShoppingCart extends Component
         $model = $model1->findAll(['session'=>$session]);
         if(isset($model)) {
             foreach($model as $mods) {
-                $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_erp'=>$mods->id_erp, 'wishlist'=>$mods->wishlist]);
+                $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_product'=>$mods->id, 'wishlist'=>$mods->wishlist]);
                 if(!is_null($model2)) { //if product is already in user cart
                     $model2->qty = $mods->qty + $model2->qty;
                     $model2->status = 1;
@@ -263,7 +264,7 @@ class ShoppingCart extends Component
         // remove all from cart for current user
         $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
         foreach ($models as $model) {
-            $model2 = Product::findOne([$erp=>$model->id_erp]);
+            $model2 = Product::findOne(['product.id' => $model->id]);
             if(!is_null($model2)) {
                 $this->saveToDb($model2, 0, 0, $wishlist, $wishlist_status);
             }
@@ -288,7 +289,7 @@ class ShoppingCart extends Component
         // remove all from cart for current user
         $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
         foreach ($models as $model) {
-            $model2 = Product::findOne([$erp=>$model->id_erp]);
+            $model2 = Product::findOne(['product.id'=>$model->id]);
             if(!is_null($model2)) {
                 $this->saveToDb($model2, 0, 0, $wishlist, 0);
             }
@@ -332,17 +333,17 @@ class ShoppingCart extends Component
         }
         $prod= array();
         foreach($model2 as $model) {
-            $obs = (new Product())->findOne([$erp=>$model->id_erp]);
+            $obs = (new Product())->findOne(['product.id'=>$model->id_product]);
             if (!is_null($obs)){
                 $obs->quantity = $model->qty;
                 $obs->discountPrice = $model->discounted_price;
-                $prod[$model->id_erp] = $obs;
+                $prod[$model->id] = $obs;
             }
         }
         return $prod;
     }
 
-    public function getWishlist($name= 'default', $status=1) {
+    /*public function getWishlist($name= 'default', $status=1) {
         $erp= self::ID_ERP;
         $models = array();
         $prod= array();
@@ -350,12 +351,12 @@ class ShoppingCart extends Component
             $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => $name, 'wishlist_status' => $status, 'status'=>1]);
             if(!is_null($models)) {
                 foreach($models as $model) {
-                    if (!is_null($model->id_erp)) {
+                    if (!is_null($model->id_product)) {
                         $obs = new Product();
-                        $obs = $obs->findOne([$erp => $model->id_erp]);
-                        $prod[$model->id_erp] = $obs;
-                        $prod[$model->id_erp]->quantity = $model->qty;
-                        $prod[$model->id_erp]->discountPrice = $model->discounted_price;
+                        $obs = $obs->findOne(['product.id' => $model->id_product]);
+                        $prod[$model->id_product] = $obs;
+                        $prod[$model->id_product]->quantity = $model->qty;
+                        $prod[$model->id_product]->discountPrice = $model->discounted_price;
                     }
                 }
                 return $prod;
@@ -369,10 +370,10 @@ class ShoppingCart extends Component
             if(!is_null($models)) {
                 foreach($models as $model) {
                     $obs = new Product();
-                    $obs = $obs->findOne([$erp=>$model->id_erp]);
-                    $prod[$model->id_erp] = $obs;
-                    $prod[$model->id_erp]->quantity = $model->qty;
-                    $prod[$model->id_erp]->discountPrice = $model->discounted_price;
+                    $obs = $obs->findOne(['product.id'=>$model->id_product]);
+                    $prod[$model->id_product] = $obs;
+                    $prod[$model->id_product]->quantity = $model->qty;
+                    $prod[$model->id_product]->discountPrice = $model->discounted_price;
                 }
                 return $prod;
             }
@@ -381,7 +382,7 @@ class ShoppingCart extends Component
             }
         }
 
-    }
+    }*/
     /**
      * @param CartPositionInterface[] $positions
      */
@@ -452,7 +453,7 @@ class ShoppingCart extends Component
             $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>$wishlist]);
             foreach ($models as $model) {
                 $price = $model->price;
-                if ($product = Product::findOne(['remote_id_charisma'=>$model->id_erp]))
+                if ($product = Product::findOne(['product.id'=>$model->id_product]))
                     $vat = $product->vat;
                 else
                     continue;
@@ -506,7 +507,7 @@ class ShoppingCart extends Component
             $this->_positions = unserialize(Yii::$app->session[$this->cartId]);
     }
 
-    public function getAllWishlists($status=1){
+    /*public function getAllWishlists($status=1){
         if (!\Yii::$app->user->isGuest) {
             $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'wishlist_status'=>$status]);
             $wish= array();
@@ -518,14 +519,18 @@ class ShoppingCart extends Component
             $wishlists = array();
             foreach ($models as $mods) {
                 if(in_array($mods->wishlist, $wish)) {
-                    if ($mods->status == 1 && !is_null($mods->id_erp)) {
-                        $wishlists[$mods->wishlist][] = $mods;
+                    if ($mods->status == 1 && !is_null($mods->id_product)) {
+                        $wishlists[$mods->wishlist]['items'][] = $mods;
+                        $wishlists[$mods->wishlist]['name'] = $mods->wishlist;
                     }
                 }
             }
             foreach ($models as $empty) {
                 if (!array_key_exists($empty->wishlist, $wishlists) && !is_null($empty->wishlist)) {
-                    $wishlists[$empty->wishlist]=null;
+                    $wishlists[$empty->wishlist]=[
+                        'name' => $empty->wishlist,
+                        'items' => []
+                    ];
                 }
             }
             //die();
@@ -534,9 +539,9 @@ class ShoppingCart extends Component
         else {
             return array();
         }
-    }
+    }*/
 
-    public static function createWishlist($name) {
+    /*public static function createWishlist($name) {
         $exists = Cart::findAll(['wishlist'=>$name, 'wishlist_status'=>1, 'id_user'=>Yii::$app->user->getId()]);
         if(count($exists) == 0 ) {
             $cart = new Cart();
@@ -551,8 +556,8 @@ class ShoppingCart extends Component
         else {
             return 'wishlist '.$name .' already exists';
         }
-    }
-    public static function renameWishlist($name, $newName) {
+    }*/
+    /*public static function renameWishlist($name, $newName) {
         if (!\Yii::$app->user->isGuest) {
             $exists = Cart::findAll(['wishlist' => $name, 'wishlist_status' => 1, 'id_user' => \Yii::$app->user->getId()]);
             if (count($exists) != 0) {
@@ -568,8 +573,8 @@ class ShoppingCart extends Component
         else {
             return false;
         }
-    }
-    public function moveProdFromWishlist($product,$wishlist, $newWishlist) {
+    }*/
+    /*public function moveProdFromWishlist($product,$wishlist, $newWishlist) {
         $erp = self::ID_ERP;
         if (!\Yii::$app->user->isGuest) {
             $old= Cart::findAll(['wishlist'=>$wishlist, 'wishlist_status'=>1, 'id_user'=>\Yii::$app->user->getId()]);
@@ -581,7 +586,7 @@ class ShoppingCart extends Component
                 $newWish->wishlist_status = 1;
                 $newWish->save();
             }
-            $wish = Cart::findOne(['id_erp'=>$product->$erp, 'wishlist'=>$wishlist, 'wishlist_status'=>1, 'id_user'=>\Yii::$app->user->getId()]);
+            $wish = Cart::findOne(['product.id'=>$product->id, 'wishlist'=>$wishlist, 'wishlist_status'=>1, 'id_user'=>\Yii::$app->user->getId()]);
             if(!is_null($wish)) {
                 $this->saveToDb($product, $wish->qty, 1 , $newWishlist, 1);
                 $wish->delete();
@@ -594,5 +599,5 @@ class ShoppingCart extends Component
         else {
             return false;
         }
-    }
+    }*/
 }
