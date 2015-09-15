@@ -72,13 +72,15 @@ class ShoppingCart extends Component
         else {
             $id= "wish-".$position->getId();
         }
+        Yii::trace($quantity);
         if (isset($this->_positions[$id])) {
+            Yii::trace('found _position');
             $this->_positions[$id]->setQuantity($this->_positions[$id]->getQuantity() + $quantity);
             $this->_positions[$id]->setWishlist($this->_positions[$id]->getWishlist());
         } else {
             $position->setQuantity($quantity);
             $this->_positions[$id] = $position;
-
+            Yii::trace('not found _position');
             $position->setWishlist($wishlist);
             $this->_positions[$id] = $position;
         }
@@ -106,6 +108,7 @@ class ShoppingCart extends Component
      */
     public function saveToDb($position, $qty, $status = 1, $wishlist = null, $wishlist_status) {
 
+        Yii::trace($qty);
         $website = Yii::$app->params['website'];
         $erp = self::ID_ERP;
 
@@ -142,7 +145,7 @@ class ShoppingCart extends Component
         $cartItem->session = Yii::$app->session->id;
         $cartItem->id_user = Yii::$app->user->isGuest ? null : Yii::$app->user->getId();
         $cartItem->id_product = $position->id;
-        $cartItem->id_erp = $position->$erp;
+        //$cartItem->id_erp = $position->$erp;
         $cartItem->qty = $qty;
         $cartItem->price = $position->price;
         $cartItem->old_price = $position->oldPrice;
