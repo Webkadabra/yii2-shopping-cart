@@ -162,17 +162,16 @@ class ShoppingCart extends Component
 
     }
 
-
     /** save user to db on login for all lines where session = $session */
     /** @param int $session */
     public function saveUserToDB($session) { //problema : daca produsul se afla deja in cosul userului, trebuie facuta suma produselor.
-        $model1 = new Cart();
-        $model = $model1->findAll(['session'=>$session]);
+        $model = Cart::findAll(['session'=>$session]);
         if(isset($model)) {
             foreach($model as $mods) {
-                $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_product'=>$mods->id, 'wishlist'=>$mods->wishlist]);
-                if(!is_null($model2)) { //if product is already in user cart
-                    $model2->qty = $mods->qty + $model2->qty;
+                /** @var \frontend\models\Cart $model2 */
+                $model2 = Cart::findOne(['id_user'=>Yii::$app->user->getId(),'id_product'=>$mods->id_product]);
+                if($model2) { //if product is already in user cart
+                    $model2->qty += $mods->qty;
                     $model2->status = 1;
                     $model2->save();
                     $mods->delete();
@@ -251,7 +250,7 @@ class ShoppingCart extends Component
     public function removeAll($wishlist=null)
     {
         $erp= self::ID_ERP;
-        $this->loadFromSession();
+        // $this->loadFromSession();
         $products = $this->getPositions();
         $wishlist_status= 1;
         foreach($products as $p) {
