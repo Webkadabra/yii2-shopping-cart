@@ -440,41 +440,34 @@ class ShoppingCart extends Component
         $totalNet = 0;
         $totalDiscount=0;
         $totalCostNoDiscount = 0;
-        if (\Yii::$app->user->isGuest) {
-            foreach ($this->_positions as $position) {
-                $cost += $position->getCost($withDiscount);
+        $models = (\Yii::$app->user->isGuest ?
+            Cart::findAll([
+                'id_user'=>null,
+                'session'=>Yii::$app->session->getId(),
+                'status'=>1,
+                'wishlist'=>$wishlist,
+                'website'=>Yii::$app->params['website']]) :
+            Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>$wishlist])) ;
+        foreach ($models as $model) {
+            $price = $model->price;
+            if ($product = Product::findOne(['product.id'=>$model->id_product]))
+                $vat = $product->vat;
+            else
+                continue;
+            if (!is_null($model->discounted_price)){
+                $price = $model->discounted_price;
+                $totalDiscount += ($model->price - $model->discounted_price)*$model->qty;
             }
-            $costEvent = new CostCalculationEvent([
-                'baseCost' => $cost,
-            ]);
-            $this->trigger(self::EVENT_COST_CALCULATION, $costEvent);
-            if ($withDiscount)
-                $cost -= $costEvent->discountValue;
-            return $cost;
+            $totalCost += $price * $model->qty;
+            $totalCostNoDiscount +=$model->price *$model->qty;
+            $totalNet += Vat::removeVat($price, $vat) * $model->qty;
         }
-        else {
-            $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>$wishlist]);
-            foreach ($models as $model) {
-                $price = $model->price;
-                if ($product = Product::findOne(['product.id'=>$model->id_product]))
-                    $vat = $product->vat;
-                else
-                    continue;
-                if (!is_null($model->discounted_price)){
-                    $price = $model->discounted_price;
-                    $totalDiscount += ($model->price - $model->discounted_price)*$model->qty;
-                }
-                $totalCost += $price * $model->qty;
-                $totalCostNoDiscount +=$model->price *$model->qty;
-                $totalNet += Vat::removeVat($price, $vat) * $model->qty;
-            }
-            return [
-                'totalCost'=>$totalCost,
-                'totalDiscount'=>$totalDiscount,
-                'totalCostNoDiscount'=>$totalCostNoDiscount,
-                'totalNet'=>$totalNet,
-            ];
-        }
+        return [
+            'totalCost'=>$totalCost,
+            'totalDiscount'=>$totalDiscount,
+            'totalCostNoDiscount'=>$totalCostNoDiscount,
+            'totalNet'=>$totalNet,
+        ];
     }
 
     /**
