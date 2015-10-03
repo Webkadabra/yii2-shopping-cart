@@ -4,6 +4,7 @@ namespace yz\shoppingcart;
 
 use backend\controllers\CartController;
 use common\components\Vat;
+use common\models\Offer;
 use common\models\ProductBulkOffer;
 use frontend\models\Product;
 use yii\base\Component;
@@ -342,7 +343,7 @@ class ShoppingCart extends Component
                 $prod[$model->id] = $obs;
             }
         }
-        return $prod;
+        return Offer::calculateBestOffer($prod);
     }
 
     /*public function getWishlist($name= 'default', $status=1) {
@@ -439,27 +440,18 @@ class ShoppingCart extends Component
         $totalNet = 0;
         $totalDiscount=0;
         $totalCostNoDiscount = 0;
-        $models = (\Yii::$app->user->isGuest ?
-            Cart::findAll([
-                'id_user'=>null,
-                'session'=>Yii::$app->session->getId(),
-                'status'=>1,
-                'wishlist'=>$wishlist,
-                'website'=>Yii::$app->params['website']]) :
-            Cart::findAll(['id_user'=>Yii::$app->user->getId(),'status'=>1,'wishlist'=>$wishlist])) ;
+        $models = $this->getPositions() ;
         foreach ($models as $model) {
             $price = $model->price;
-            if ($product = Product::findOne(['product.id'=>$model->id_product]))
-                $vat = $product->vat;
-            else
-                continue;
-            if (!is_null($model->discounted_price)){
-                $price = $model->discounted_price;
-                $totalDiscount += ($model->price - $model->discounted_price)*$model->qty;
+            $vat = $model->vat;
+
+            if (!is_null($model->discountPrice)){
+                $price = $model->discountPrice;
+                $totalDiscount += ($model->price - $model->discountPrice)*$model->quantity;
             }
-            $totalCost += $price * $model->qty;
-            $totalCostNoDiscount +=$model->price *$model->qty;
-            $totalNet += Vat::removeVat($price, $vat) * $model->qty;
+            $totalCost += $price * $model->quantity;
+            $totalCostNoDiscount +=$model->price *$model->quantity;
+            $totalNet += Vat::removeVat($price, $vat) * $model->quantity;
         }
         return [
             'totalCost'=>$totalCost,
