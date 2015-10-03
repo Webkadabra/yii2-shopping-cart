@@ -103,11 +103,10 @@ class ShoppingCart extends Component
      * @param int                   $qty
      * @param int                   $status
      * @param int                   $wishlist
-     * @param string                $wishlist_status
      *
      * @throws Exception
      */
-    public function saveToDb($position, $qty, $status = 1, $wishlist = null, $wishlist_status) {
+    public function saveToDb($position, $qty, $status = 1, $wishlist = null) {
 
         Yii::trace($qty);
         $website = Yii::$app->params['website'];
@@ -154,7 +153,6 @@ class ShoppingCart extends Component
         $cartItem->discounted_price = $price;
         $cartItem->status = $status;
         $cartItem->wishlist = $wishlist;
-        $cartItem->wishlist_status = $wishlist_status;
         $cartItem->website = $website;
 
         if (!$cartItem->save()) {
@@ -216,6 +214,43 @@ class ShoppingCart extends Component
             'data' => ['action' => 'update', 'position' => $this->_positions[$id]],
         ]));
         $this->saveToDb($position,$quantity, 1, $wishlist, 1);
+        $this->saveToSession();
+    }
+
+    /**
+     * @param CartPositionInterface $position
+     * @param int $quantity
+     */
+    public function removeQuantity($position, $quantity)
+    {
+        $id= "cart-".$position->getId();
+
+        //var_dump($this->_positions);die();
+        if (!\Yii::$app->user->isGuest) {
+            $model = Cart::findOne(['id_product'=>$position->getId(),'id_user'=>Yii::$app->user->getId(), 'status'=>1]);
+        }
+        else {
+            $model = Cart::findOne(['id_product'=>$position->getId(),'id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1]);
+        }
+        if (isset($this->_positions[$id])) {
+            $quantity = $model->qty - $quantity;
+        } else {
+            $quantity = 0;
+        }
+
+        if ($quantity <= 0) {
+            $this->remove($position);
+            $this->saveToDb($position,$quantity, $status = 0, 1);
+            return;
+        }
+        $this->_positions[$id]->setQuantity($quantity);
+        $this->trigger(self::EVENT_POSITION_UPDATE, new Event([
+            'data' => 464,
+        ]));
+        $this->trigger(self::EVENT_CART_CHANGE, new Event([
+            'data' => ['action' => 'update', 'position' => $this->_positions[$id]],
+        ]));
+        $this->saveToDb($position,$quantity, 1, null, 1);
         $this->saveToSession();
     }
 
