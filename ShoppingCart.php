@@ -4,7 +4,7 @@ namespace yz\shoppingcart;
 
 use backend\controllers\CartController;
 use common\components\Vat;
-use common\models\Offer;
+use frontend\models\Offer;
 use common\models\ProductBulkOffer;
 use frontend\models\Product;
 use yii\base\Component;
@@ -240,7 +240,6 @@ class ShoppingCart extends Component
 
         if ($quantity <= 0) {
             $this->remove($position);
-            $this->saveToDb($position,$quantity, $status = 0, 1);
             return;
         }
         $this->_positions[$id]->setQuantity($quantity);
