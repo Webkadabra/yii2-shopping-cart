@@ -481,7 +481,11 @@ class ShoppingCart extends Component
                 $price = $model->discountPrice;
                 $totalDiscount += ($model->price - $model->discountPrice)*$model->quantity;
             }
+            if($model['offer'] && $model['offer']['discountPrice'] && $model['offer']['quantity']) {
+                $price -= ($model['offer']['discountPrice'] * $model['offer']['quantity']);
+            }
             $totalCost += $price * $model->quantity;
+
             $totalCostNoDiscount +=$model->price *$model->quantity;
             $totalNet += Vat::removeVat($price, $vat) * $model->quantity;
         }
