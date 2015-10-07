@@ -232,12 +232,10 @@ class ShoppingCart extends Component
         else {
             $model = Cart::findOne(['id_product'=>$position->getId(),'id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1]);
         }
-        if (isset($this->_positions[$id])) {
-            $quantity = $model->qty - $quantity;
-        } else {
-            $quantity = 0;
+        if (!isset($this->_positions[$id])) {
+            $this->_positions[$id] = $position;
         }
-
+        $quantity = $model->qty - $quantity;
         if ($quantity <= 0) {
             $this->remove($position);
             return;
