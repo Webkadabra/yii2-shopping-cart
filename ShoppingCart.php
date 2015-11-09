@@ -376,7 +376,7 @@ class ShoppingCart extends Component
         $prod= array();
         $productModel = $this->productModel;
         foreach($model2 as $model) {
-            $obs = $productModel::findOne(['product.id'=>$model->id_product]);
+	        $obs = $productModel::find()->where([$productModel::tableName().'.id' => $model->id_product])->one();
             if (!is_null($obs)){
                 $obs->quantity = $model->qty;
                 $obs->discountPrice = $model->discounted_price;
