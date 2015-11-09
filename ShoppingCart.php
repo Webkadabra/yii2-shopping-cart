@@ -2,17 +2,14 @@
 
 namespace yz\shoppingcart;
 
-use backend\controllers\CartController;
-use common\components\Vat;
-use frontend\models\Offer;
-use common\models\ProductBulkOffer;
-use frontend\models\Product;
-use yii\base\Component;
-use yii\base\ErrorException;
-use yii\base\Event;
 use Yii;
+use yii\base\Component;
+use yii\base\Event;
+use yii\di\Instance;
+use yii\web\Session;
 use frontend\models\Cart;
 use yii\db\Exception;
+use common\models\ProductBulkOffer;
 
 
 /**
@@ -23,6 +20,7 @@ use yii\db\Exception;
  * @property bool $isEmpty Returns true if cart is empty
  * @property string $hash Returns hash (md5) of the current cart, that is uniq to the current combination
  * of positions, quantities and costs
+ * @property string $serialized Get/set serialized content of the cart
  * @package \yz\shoppingcart
  */
 class ShoppingCart extends Component
@@ -38,9 +36,23 @@ class ShoppingCart extends Component
     /** Triggered on after cart cost calculation */
     const EVENT_COST_CALCULATION = 'costCalculation';
 
-    /** To define de primary key from product model */
-    const ID_ERP = 'remote_id_charisma';
+    /**
+     * model of the product in cart
+     * @var \yii\base\Model
+     */
+    public $productModel;
 
+    /**
+     * If true (default) cart will be automatically stored in and loaded from session.
+     * If false - you should do this manually with saveToSession and loadFromSession methods
+     * @var bool
+     */
+    public $storeInSession = true;
+    /**
+     * Session component
+     * @var string|Session
+     */
+    public $session = 'session';
     /**
      * Shopping cart ID to support multiple carts
      * @var string
@@ -57,67 +69,95 @@ class ShoppingCart extends Component
 
     public function init()
     {
-        $this->loadFromSession();
+        if ($this->storeInSession)
+            $this->loadFromSession();
+    }
+
+    /**
+     * Loads cart from session
+     */
+    public function loadFromSession()
+    {
+        $this->session = Instance::ensure($this->session, Session::className());
+        if (isset($this->session[$this->cartId]))
+            $this->setSerialized($this->session[$this->cartId]);
+    }
+
+    /**
+     * Saves cart to the session
+     */
+    public function saveToSession()
+    {
+        $this->session = Instance::ensure($this->session, Session::className());
+        $this->session[$this->cartId] = $this->getSerialized();
+    }
+
+    /**
+     * Sets cart from serialized string
+     * @param string $serialized
+     */
+    public function setSerialized($serialized)
+    {
+        $this->_positions = unserialize($serialized);
     }
 
     /**
      * @param CartPositionInterface $position
      * @param int $quantity
      */
-    //todo scoatem wishlist_status????
-    public function put($position, $quantity = 1, $wishlist = null, $wishlist_status=1) //scoatem wishlist_status????
+    public function put($position, $quantity = 1)
     {
-        if(is_null($wishlist)) {
-            $id= "cart-".$position->getId();
-        }
-        else {
-            $id= "wish-".$position->getId();
-        }
+        $id= $position->getId();
         Yii::trace($quantity);
         if (isset($this->_positions[$id])) {
             Yii::trace('found _position');
             $this->_positions[$id]->setQuantity($this->_positions[$id]->getQuantity() + $quantity);
-            $this->_positions[$id]->setWishlist($this->_positions[$id]->getWishlist());
         } else {
             $position->setQuantity($quantity);
             $this->_positions[$id] = $position;
             Yii::trace('not found _position');
-            $position->setWishlist($wishlist);
             $this->_positions[$id] = $position;
         }
-
-
-        $this->trigger(self::EVENT_POSITION_PUT, new Event([
-            'data' => $this->_positions[$id],
+        $this->trigger(self::EVENT_POSITION_PUT, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_POSITION_PUT,
+            'position' => $this->_positions[$id],
         ]));
-        $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'put', 'position' => $this->_positions[$id]],
+        $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_POSITION_PUT,
+            'position' => $this->_positions[$id],
         ]));
         $qty = $this->_positions[$id]->getQuantity();
-        $this->saveToDb($position, $qty, 1 , $wishlist, $wishlist_status);
-        $this->saveToSession();
+        $this->saveToDb($position, $qty, 1 );
+        if ($this->storeInSession)
+            $this->saveToSession();
+    }
+
+    /**
+     * Returns cart positions as serialized items
+     * @return string
+     */
+    public function getSerialized()
+    {
+        return serialize($this->_positions);
     }
 
     /**
      * @param CartPositionInterface $position
      * @param int                   $qty
      * @param int                   $status
-     * @param int                   $wishlist
      *
      * @throws Exception
      */
-    public function saveToDb($position, $qty, $status = 1, $wishlist = null) {
+    public function saveToDb($position, $qty, $status = 1) {
 
         Yii::trace($qty);
         $website = Yii::$app->params['website'];
-        $erp = self::ID_ERP;
 
         if (Yii::$app->user->getIsGuest()) {
             $searchCriteria = ['id_product' => $position->id, 'session' => Yii::$app->session->id,
-                'wishlist' => $wishlist, 'website' => $website];
+                 'website' => $website];
         } else {
             $searchCriteria = ['id_product' => $position->id, 'id_user' => Yii::$app->user->getId(),
-                'wishlist' => $wishlist,
                 'website' => $website];
         }
 
@@ -126,6 +166,7 @@ class ShoppingCart extends Component
             $cartItem = new Cart();
         }
         $price = $position->discountPrice;
+        //TODO to remove and use offers
         $bulks = ProductBulkOffer::findAll(['id_product'=>$position->id, 'id_website'=>$website]);
         $lastMax=0;
         $lastMaxPercent=0;
@@ -152,7 +193,6 @@ class ShoppingCart extends Component
         //$cartItem->discounted_price = $position->discountPrice;
         $cartItem->discounted_price = $price;
         $cartItem->status = $status;
-        $cartItem->wishlist = $wishlist;
         $cartItem->website = $website;
 
         if (!$cartItem->save()) {
@@ -187,34 +227,33 @@ class ShoppingCart extends Component
      * @param CartPositionInterface $position
      * @param int $quantity
      */
-    public function update($position, $quantity, $wishlist=null)
+    public function update($position, $quantity)
     {
         if ($quantity <= 0) {
-            $this->remove($position, $wishlist);
-            $this->saveToDb($position,$quantity, $status = 0, $wishlist, 1);
+            $this->remove($position);
+            $this->saveToDb($position,$quantity, $status = 0);
             return;
         }
-        if(is_null($wishlist)) {
-            $id= "cart-".$position->getId();
-        }
-        else {
-            $id= "wish-".$position->getId();
-        }
-        //var_dump($this->_positions);die();
+        $id= $position->getId();
+
         if (isset($this->_positions[$id])) {
             $this->_positions[$id]->setQuantity($quantity);
         } else {
             $position->setQuantity($quantity);
             $this->_positions[$id] = $position;
         }
-        $this->trigger(self::EVENT_POSITION_UPDATE, new Event([
-            'data' => 464,
+        $this->trigger(self::EVENT_POSITION_UPDATE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_UPDATE,
+            'position' => $this->_positions[$id],
         ]));
-        $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'update', 'position' => $this->_positions[$id]],
+        $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_UPDATE,
+            'position' => $this->_positions[$id],
         ]));
-        $this->saveToDb($position,$quantity, 1, $wishlist, 1);
-        $this->saveToSession();
+        $this->saveToDb($position,$quantity, 1);
+       
+        if ($this->storeInSession)
+            $this->saveToSession();
     }
 
     /**
@@ -223,14 +262,13 @@ class ShoppingCart extends Component
      */
     public function removeQuantity($position, $quantity)
     {
-        $id= "cart-".$position->getId();
+        $id= $position->getId();
 
-        //var_dump($this->_positions);die();
         if (!\Yii::$app->user->isGuest) {
-            $model = Cart::findOne(['id_product'=>$position->getId(),'id_user'=>Yii::$app->user->getId(), 'status'=>1]);
+            $model = Cart::findOne(['id_product'=>$id,'id_user'=>Yii::$app->user->getId(), 'status'=>1]);
         }
         else {
-            $model = Cart::findOne(['id_product'=>$position->getId(),'id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1]);
+            $model = Cart::findOne(['id_product'=>$id,'id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1]);
         }
         if (!isset($this->_positions[$id])) {
             $this->_positions[$id] = $position;
@@ -241,13 +279,15 @@ class ShoppingCart extends Component
             return;
         }
         $this->_positions[$id]->setQuantity($quantity);
-        $this->trigger(self::EVENT_POSITION_UPDATE, new Event([
-            'data' => 464,
+        $this->trigger(self::EVENT_POSITION_UPDATE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_UPDATE,
+            'position' => $this->_positions[$id],
         ]));
-        $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'update', 'position' => $this->_positions[$id]],
+        $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_UPDATE,
+            'position' => $this->_positions[$id],
         ]));
-        $this->saveToDb($position,$quantity, 1, null, 1);
+        $this->saveToDb($position,$quantity, 1);
         $this->saveToSession();
     }
 
@@ -255,15 +295,9 @@ class ShoppingCart extends Component
      * Removes position from the cart
      * @param CartPositionInterface $position
      */
-    public function remove($position, $wishlist=null)
+    public function remove($position)
     {
-        if(is_null($wishlist)) {
-            $id= "cart-".$position->getId();
-        }
-        else {
-            $id= "wish-".$position->getId();
-        }
-        //$erp= self::ID_ERP;
+        $id = $position->getId();
         if(array_key_exists($id, $this->_positions)) {
             $this->trigger(self::EVENT_BEFORE_POSITION_REMOVE, new Event([
                 'data' => $this->_positions[$id],
@@ -274,59 +308,33 @@ class ShoppingCart extends Component
             unset($this->_positions[$id]);
             $this->saveToSession();
         }
-        $this->saveToDb($position,0,0,$wishlist,1);
+        $this->saveToDb($position,0,0);
     }
 
     /**
      * Remove all positions
      */
-    public function removeAll($wishlist=null)
+    public function removeAll()
     {
-        $erp= self::ID_ERP;
         // $this->loadFromSession();
         $products = $this->getPositions();
-        $wishlist_status= 1;
         foreach($products as $p) {
-            $this->saveToDb($p, 0, 0,$wishlist, $wishlist_status);
+            $this->saveToDb($p, 0, 0);
         }
         $this->_positions = [];
-
-        $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'removeAll'],
+        $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_REMOVE_ALL,
         ]));
-        $this->saveToSession();
+        if ($this->storeInSession)
+            $this->saveToSession();
 
         // remove all from cart for current user
-        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
+        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId()]);
+        $productModel = $this->productModel;
         foreach ($models as $model) {
-            $model2 = Product::findOne(['product.id' => $model->id]);
+            $model2 = $productModel::findOne([$productModel::tableName().'.id' => $model->id]);
             if(!is_null($model2)) {
-                $this->saveToDb($model2, 0, 0, $wishlist, $wishlist_status);
-            }
-        }
-    }
-
-    public function deleteWishlist($wishlist='default') {
-        $erp= self::ID_ERP;
-        $this->loadFromSession();
-        $products = $this->_positions;
-        $wishlist_status= 0;
-        foreach($products as $p) {
-            $this->saveToDb($p, 0, 0,$wishlist, $wishlist_status);
-        }
-        $this->_positions = [];
-
-        $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'removeAll'],
-        ]));
-        $this->saveToSession();
-
-        // remove all from cart for current user
-        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
-        foreach ($models as $model) {
-            $model2 = Product::findOne(['product.id'=>$model->id]);
-            if(!is_null($model2)) {
-                $this->saveToDb($model2, 0, 0, $wishlist, 0);
+                $this->saveToDb($model2, 0, 0);
             }
         }
     }
@@ -357,77 +365,40 @@ class ShoppingCart extends Component
     /**
      * @return CartPositionInterface[]
      */
-    public function getPositions($wishlist=null)
+    public function getPositions()
     {
-        $erp= self::ID_ERP;
         if (!\Yii::$app->user->isGuest) {
-            $model2 = (new Cart())->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1,'wishlist'=>$wishlist, 'website'=>Yii::$app->params['website']]);
+            $model2 = (new Cart())->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1, 'website'=>Yii::$app->params['website']]);
         }
         else {
-            $model2 = (new Cart())->findAll(['id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1,'wishlist'=>$wishlist, 'website'=>Yii::$app->params['website']]);
+            $model2 = (new Cart())->findAll(['id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1, 'website'=>Yii::$app->params['website']]);
         }
         $prod= array();
+        $productModel = $this->productModel;
         foreach($model2 as $model) {
-            $obs = (new Product())->findOne(['product.id'=>$model->id_product]);
+            $obs = $productModel::findOne(['product.id'=>$model->id_product]);
             if (!is_null($obs)){
                 $obs->quantity = $model->qty;
                 $obs->discountPrice = $model->discounted_price;
                 $prod[$model->id] = $obs;
             }
         }
-        return Offer::calculateBestOffer($prod);
+        return $prod;
     }
 
-    /*public function getWishlist($name= 'default', $status=1) {
-        $erp= self::ID_ERP;
-        $models = array();
-        $prod= array();
-        if (!\Yii::$app->user->isGuest) {
-            $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => $name, 'wishlist_status' => $status, 'status'=>1]);
-            if(!is_null($models)) {
-                foreach($models as $model) {
-                    if (!is_null($model->id_product)) {
-                        $obs = new Product();
-                        $obs = $obs->findOne(['product.id' => $model->id_product]);
-                        $prod[$model->id_product] = $obs;
-                        $prod[$model->id_product]->quantity = $model->qty;
-                        $prod[$model->id_product]->discountPrice = $model->discounted_price;
-                    }
-                }
-                return $prod;
-            }
-            else {
-                return 'empty';
-            }
-        }
-        else {
-            $models = Cart::findAll(['id_user' =>null, 'wishlist' =>'default', 'session'=>Yii::$app->session->id,'wishlist_status' => $status, 'status'=>1]);
-            if(!is_null($models)) {
-                foreach($models as $model) {
-                    $obs = new Product();
-                    $obs = $obs->findOne(['product.id'=>$model->id_product]);
-                    $prod[$model->id_product] = $obs;
-                    $prod[$model->id_product]->quantity = $model->qty;
-                    $prod[$model->id_product]->discountPrice = $model->discounted_price;
-                }
-                return $prod;
-            }
-            else {
-                return 'empty';
-            }
-        }
-
-    }*/
     /**
      * @param CartPositionInterface[] $positions
      */
     public function setPositions($positions)
     {
-        $this->_positions = $positions;
-        $this->trigger(self::EVENT_CART_CHANGE, new Event([
-            'data' => ['action' => 'positions'],
+        $this->_positions = array_filter($positions, function (CartPositionInterface $position) {
+            return $position->quantity > 0;
+        });
+        $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_SET_POSITIONS,
         ]));
-        $this->saveToSession();
+        if ($this->storeInSession)
+            $this->saveToSession();
     }
 
     /**
@@ -446,7 +417,7 @@ class ShoppingCart extends Component
     {
         $count = 0;
         if (!\Yii::$app->user->isGuest) {
-            $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'wishlist' => null, 'status' => 1, 'website'=>Yii::$app->params['website']]);
+            $models = Cart::findAll(['id_user' => Yii::$app->user->getId(), 'status' => 1, 'website'=>Yii::$app->params['website']]);
             foreach ($models as $model) {
                 $count += $model->qty;
             }
@@ -464,10 +435,8 @@ class ShoppingCart extends Component
      * @return int
      */
     //TODO ce facem in cazul in care produsul a fost adaugat in cos, si intre timp a fost modificat???
-    public function getCost($wishlist=null,$withDiscount = false)
+    public function getCost($withDiscount = false)
     {
-        //$id_erp=self::ID_ERP;
-        $cost = 0;
         $totalCost=0;
         $totalNet = 0;
         $totalDiscount=0;
@@ -487,7 +456,10 @@ class ShoppingCart extends Component
                 $totalCost -= ($model['offer']['discountPrice'] * $model['offer']['quantity']);
             }
             $totalCostNoDiscount +=$model->price *$model->quantity;
-            $totalNet += Vat::removeVat($price, $vat) * $model->quantity;
+
+            if ($vat > 0 && $vat < 1)
+                $vat = 100 * $vat;
+            $totalNet += ( 100 * ($price) / (100 + ($vat)) ) * $model->quantity;
         }
         return [
             'totalCost'=>$totalCost,
@@ -511,116 +483,4 @@ class ShoppingCart extends Component
         }
         return md5(serialize($data));
     }
-
-    protected function saveToSession()
-    {
-        /*
-        echo "<pre>";
-        var_dump($this->_positions);
-        var_dump(Yii::$app->session[$this->cartId]);
-        echo "</pre>";
-        die();
-        */
-        Yii::$app->session[$this->cartId] = serialize($this->_positions);
-    }
-
-    protected function loadFromSession()
-    {
-        if (isset(Yii::$app->session[$this->cartId]))
-            $this->_positions = unserialize(Yii::$app->session[$this->cartId]);
-    }
-
-    /*public function getAllWishlists($status=1){
-        if (!\Yii::$app->user->isGuest) {
-            $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(),'wishlist_status'=>$status]);
-            $wish= array();
-            foreach($models as $model) {
-                if (!is_null($model->wishlist)) {
-                    $wish[] = $model->wishlist;
-                }
-            }
-            $wishlists = array();
-            foreach ($models as $mods) {
-                if(in_array($mods->wishlist, $wish)) {
-                    if ($mods->status == 1 && !is_null($mods->id_product)) {
-                        $wishlists[$mods->wishlist]['items'][] = $mods;
-                        $wishlists[$mods->wishlist]['name'] = $mods->wishlist;
-                    }
-                }
-            }
-            foreach ($models as $empty) {
-                if (!array_key_exists($empty->wishlist, $wishlists) && !is_null($empty->wishlist)) {
-                    $wishlists[$empty->wishlist]=[
-                        'name' => $empty->wishlist,
-                        'items' => []
-                    ];
-                }
-            }
-            //die();
-            return $wishlists;
-        }
-        else {
-            return array();
-        }
-    }*/
-
-    /*public static function createWishlist($name) {
-        $exists = Cart::findAll(['wishlist'=>$name, 'wishlist_status'=>1, 'id_user'=>Yii::$app->user->getId()]);
-        if(count($exists) == 0 ) {
-            $cart = new Cart();
-            $cart->session = Yii::$app->session->id;
-            $cart->id_user = Yii::$app->user->getId();
-            $cart->status = 0;
-            $cart->wishlist = $name;
-            $cart->wishlist_status = 1;
-            $cart->save();
-            return $cart;
-        }
-        else {
-            return 'wishlist '.$name .' already exists';
-        }
-    }*/
-    /*public static function renameWishlist($name, $newName) {
-        if (!\Yii::$app->user->isGuest) {
-            $exists = Cart::findAll(['wishlist' => $name, 'wishlist_status' => 1, 'id_user' => \Yii::$app->user->getId()]);
-            if (count($exists) != 0) {
-                foreach ($exists as $wish) {
-                    $wish->wishlist = $newName;
-                    $wish->save();
-                }
-                return true;
-            } else {
-                return false;
-            }
-        }
-        else {
-            return false;
-        }
-    }*/
-    /*public function moveProdFromWishlist($product,$wishlist, $newWishlist) {
-        $erp = self::ID_ERP;
-        if (!\Yii::$app->user->isGuest) {
-            $old= Cart::findAll(['wishlist'=>$wishlist, 'wishlist_status'=>1, 'id_user'=>\Yii::$app->user->getId()]);
-            if (count($old) == 1) {
-                $newWish = new Cart();
-                $newWish->id_user = \Yii::$app->user->getId();
-                $newWish->session = \Yii::$app->session->getId();
-                $newWish->wishlist = $wishlist;
-                $newWish->wishlist_status = 1;
-                $newWish->save();
-            }
-            $wish = Cart::findOne(['product.id'=>$product->id, 'wishlist'=>$wishlist, 'wishlist_status'=>1, 'id_user'=>\Yii::$app->user->getId()]);
-            if(!is_null($wish)) {
-                $this->saveToDb($product, $wish->qty, 1 , $newWishlist, 1);
-                $wish->delete();
-                return true;
-            }
-            else {
-                return false;
-            }
-        }
-        else {
-            return false;
-        }
-    }*/
 }

@@ -2,7 +2,8 @@
 
 namespace yz\shoppingcart;
 
-use yii\base\Model;
+use yii\base\Component;
+use yii\base\Object;
 
 /**
  * Trait CartPositionTrait
@@ -16,7 +17,6 @@ trait CartPositionTrait
 {
     protected $_quantity;
     protected $_oldPrice;
-    protected $_wishlist;
 
     /**
      * @return int
@@ -30,20 +30,6 @@ trait CartPositionTrait
      */
     public function setQuantity($quantity) {
         $this->_quantity = $quantity;
-    }
-
-    /**
-     * @return string
-     */
-    public function getWishlist() {
-        return $this->_wishlist;
-    }
-
-    /**
-     * @param string $wishlist
-     */
-    public function setWishlist($wishlist) {
-        $this->_wishlist = $wishlist;
     }
 
     /**
@@ -62,20 +48,20 @@ trait CartPositionTrait
 
     /**
      * Default implementation for getCost function. Cost is calculated as price * quantity
-     *
      * @param bool $withDiscount
-     *
      * @return int
      */
-    public function getCost($withDiscount = true) {
-        /** @var Model|CartPositionInterface|self $this */
+    public function getCost($withDiscount = true)
+    {
+        /** @var Component|CartPositionInterface|self $this */
         $cost = $this->getQuantity() * $this->getPrice();
         $costEvent = new CostCalculationEvent([
             'baseCost' => $cost,
         ]);
-        $this->trigger(CartPositionInterface::EVENT_COST_CALCULATION, $costEvent);
+        if ($this instanceof Component)
+            $this->trigger(CartPositionInterface::EVENT_COST_CALCULATION, $costEvent);
         if ($withDiscount)
-            $cost -= $costEvent->discountValue;
+            $cost = max(0, $cost - $costEvent->discountValue);
         return $cost;
     }
 } 

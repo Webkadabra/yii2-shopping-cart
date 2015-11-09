@@ -49,18 +49,6 @@ interface CartPositionInterface
     /**
      * @return mixed
      */
-    public function getWishlist();
-
-    /**
-     * @param string $wishlist
-     *
-     * @return mixed
-     */
-    public function setWishlist($wishlist);
-
-    /**
-     * @return mixed
-     */
     public function getOldPrice();
 
     /**
