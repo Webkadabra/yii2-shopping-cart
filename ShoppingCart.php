@@ -299,7 +299,7 @@ class ShoppingCart extends Component
         // remove all from cart for current user
         $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
         foreach ($models as $model) {
-            $model2 = Product::findOne(['product.id' => $model->id]);
+            $model2 = \frontend\models\Product::findOne(['product.id' => $model->id]);
             if(!is_null($model2)) {
                 $this->saveToDb($model2, 0, 0, $wishlist, $wishlist_status);
             }
@@ -324,7 +324,7 @@ class ShoppingCart extends Component
         // remove all from cart for current user
         $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'wishlist'=>$wishlist]);
         foreach ($models as $model) {
-            $model2 = Product::findOne(['product.id'=>$model->id]);
+            $model2 = \frontend\models\Product::findOne(['product.id'=>$model->id]);
             if(!is_null($model2)) {
                 $this->saveToDb($model2, 0, 0, $wishlist, 0);
             }
@@ -368,7 +368,7 @@ class ShoppingCart extends Component
         }
         $prod= array();
         foreach($model2 as $model) {
-            $obs = (new Product())->findOne(['product.id'=>$model->id_product]);
+            $obs = (new \frontend\models\Product())->findOne(['product.id'=>$model->id_product]);
             if (!is_null($obs)){
                 $obs->quantity = $model->qty;
                 $obs->discountPrice = $model->discounted_price;
