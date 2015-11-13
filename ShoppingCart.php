@@ -6,6 +6,7 @@ use Yii;
 use yii\base\Component;
 use yii\base\Event;
 use yii\di\Instance;
+use yii\helpers\ArrayHelper;
 use yii\web\Session;
 use frontend\models\Cart;
 use yii\db\Exception;
@@ -43,6 +44,12 @@ class ShoppingCart extends Component
     public $productModel;
 
     /**
+     * model of offers, should implement
+     * @var CartOfferInterface
+     */
+    public $offerModel;
+
+    /**
      * If true (default) cart will be automatically stored in and loaded from session.
      * If false - you should do this manually with saveToSession and loadFromSession methods
      * @var bool
@@ -66,6 +73,12 @@ class ShoppingCart extends Component
      * @var CartPositionInterface[]
      */
     protected $_positions = [];
+    /**
+     * @var CartVoucherInterface[]
+     */
+    protected $_vouchers = [];
+
+
 
     public function init()
     {
@@ -98,7 +111,9 @@ class ShoppingCart extends Component
      */
     public function setSerialized($serialized)
     {
-        $this->_positions = unserialize($serialized);
+        $unserialized =  unserialize($serialized);
+        $this->_positions = $unserialized['p'];
+        $this->_vouchers = $unserialized['v'];
     }
 
     /**
@@ -108,14 +123,10 @@ class ShoppingCart extends Component
     public function put($position, $quantity = 1)
     {
         $id= $position->getId();
-        Yii::trace($quantity);
         if (isset($this->_positions[$id])) {
-            Yii::trace('found _position');
             $this->_positions[$id]->setQuantity($this->_positions[$id]->getQuantity() + $quantity);
         } else {
             $position->setQuantity($quantity);
-            $this->_positions[$id] = $position;
-            Yii::trace('not found _position');
             $this->_positions[$id] = $position;
         }
         $this->trigger(self::EVENT_POSITION_PUT, new CartActionEvent([
@@ -138,7 +149,7 @@ class ShoppingCart extends Component
      */
     public function getSerialized()
     {
-        return serialize($this->_positions);
+        return serialize(['p' => $this->_positions, 'v' => $this->_vouchers]);
     }
 
     /**
@@ -273,7 +284,7 @@ class ShoppingCart extends Component
         if (!isset($this->_positions[$id])) {
             $this->_positions[$id] = $position;
         }
-        $quantity = $model->qty - $quantity;
+        $quantity = $model ? $model->qty - $quantity : 0;
         if ($quantity <= 0) {
             $this->remove($position);
             return;
@@ -322,6 +333,7 @@ class ShoppingCart extends Component
             $this->saveToDb($p, 0, 0);
         }
         $this->_positions = [];
+        $this->_vouchers = [];
         $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
             'action' => CartActionEvent::ACTION_REMOVE_ALL,
         ]));
@@ -368,21 +380,40 @@ class ShoppingCart extends Component
     public function getPositions()
     {
         if (!\Yii::$app->user->isGuest) {
-            $model2 = (new Cart())->findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1, 'website'=>Yii::$app->params['website']]);
+            $models = Cart::findAll(['id_user'=>Yii::$app->user->getId(), 'status'=>1, 'website'=>Yii::$app->params['website']]);
         }
         else {
-            $model2 = (new Cart())->findAll(['id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1, 'website'=>Yii::$app->params['website']]);
+            $models = Cart::findAll(['id_user'=>null,'session'=>Yii::$app->session->getId(), 'status'=>1, 'website'=>Yii::$app->params['website']]);
+        }
+        $vouchers = $this->getVouchers();
+        $voucherDiscount = 0;
+        $voucherId = null;
+        foreach($vouchers as $voucher){
+            if($voucher->getPercent() && $voucher->getPercent() > $voucherDiscount){
+                $voucherDiscount = $voucher->getPercent();
+                $voucherId = $voucher->getId();
+            }
         }
         $prod= array();
         $productModel = $this->productModel;
-        foreach($model2 as $model) {
-	        $obs = $productModel::find()->where([$productModel::tableName().'.id' => $model->id_product])->one();
-            if (!is_null($obs)){
-                $obs->quantity = $model->qty;
-                $obs->discountPrice = $model->discounted_price;
-                $prod[$model->id] = $obs;
+        $indexedModels = ArrayHelper::index($models,'id_product');
+        $products = $productModel::find()->where([$productModel::tableName().'.id' => ArrayHelper::getColumn($models, 'id_product')])->all();
+        foreach($products as $product){
+            $product->quantity = $indexedModels[$product->id]->qty;
+            $product->discountPrice = $indexedModels[$product->id]->discounted_price;
+            if($voucherDiscount && (!$product->discountPrice || $product->discountPrice > ($product->getPrice() - $product->getPrice() * $voucherDiscount / 100))){
+                $product->discountPrice = $product->getPrice() - $product->getPrice() * $voucherDiscount / 100;
+                $product->voucherId = $voucherId;
             }
+            $prod[$indexedModels[$product->id]->id] = $product;
         }
+
+        if($this->offerModel){
+            $offerModel = $this->offerModel;
+            $prod = $offerModel::calculateBestOffer($prod);
+        }
+
+
         return $prod;
     }
 
@@ -441,7 +472,10 @@ class ShoppingCart extends Component
         $totalNet = 0;
         $totalDiscount=0;
         $totalCostNoDiscount = 0;
-        $models = $this->getPositions() ;
+        $voucherCost = 0;
+        $models = $this->getPositions();
+        $vouchers = $this->getVouchers();
+
         foreach ($models as $model) {
             $price = $model->price;
             $vat = $model->vat;
@@ -461,11 +495,22 @@ class ShoppingCart extends Component
                 $vat = 100 * $vat;
             $totalNet += ( 100 * ($price) / (100 + ($vat)) ) * $model->quantity;
         }
+
+        foreach($vouchers as $voucher){
+            if($voucher->getPrice()){
+                $voucherCost += $voucher->getPrice();
+            }
+        }
+
+        if($voucherCost > $totalCost) $voucherCost = $totalCost;
+        $totalCost = $totalCost - $voucherCost;
+
         return [
             'totalCost'=>$totalCost,
             'totalDiscount'=>$totalDiscount,
             'totalCostNoDiscount'=>$totalCostNoDiscount,
             'totalNet'=>$totalNet,
+            'voucherCost' => $voucherCost,
         ];
     }
 
@@ -482,5 +527,60 @@ class ShoppingCart extends Component
             $data[] = [$position->getId(), $position->getQuantity(), $position->getPrice()];
         }
         return md5(serialize($data));
+    }
+
+    /**
+     * @param CartVoucherInterface $voucher
+     */
+    public function putVoucher($voucher)
+    {
+        if (isset($this->_vouchers[$voucher->getId()])) {
+        } else {
+            $this->_vouchers[$voucher->getId()] = $voucher;
+        }
+        /*$this->trigger(self::EVENT_VOUCHER_PUT, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_VOUCHER_PUT,
+            'voucher' => $this->_vouchers[$voucher->getId()],
+        ]));
+        $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_VOUCHER_PUT,
+            'voucher' => $this->_vouchers[$voucher->getId()],
+        ]));*/
+        if ($this->storeInSession)
+            $this->saveToSession();
+    }
+    /**
+     * Removes voucher from the cart
+     * @param CartVoucherInterface $voucher
+     */
+    public function removeVoucher($voucher)
+    {
+        $this->removeVoucherById($voucher->getId());
+    }
+    /**
+     * Removes voucher from the cart by ID
+     * @param string $id
+     */
+    public function removeVoucherById($id)
+    {
+        /*$this->trigger(self::EVENT_BEFORE_VOUCHER_REMOVE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_BEFORE_VOUCHER_REMOVE,
+            'voucher' => $this->_vouchers[$id],
+        ]));
+        $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_BEFORE_VOUCHER_REMOVE,
+            'voucher' => $this->_vouchers[$id],
+        ]));*/
+        unset($this->_vouchers[$id]);
+        if ($this->storeInSession)
+            $this->saveToSession();
+    }
+
+    /**
+     * @return CartVoucherInterface[]
+     */
+    public function getVouchers()
+    {
+        return $this->_vouchers;
     }
 }

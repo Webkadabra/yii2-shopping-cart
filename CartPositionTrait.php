@@ -15,8 +15,9 @@ use yii\base\Object;
  */
 trait CartPositionTrait
 {
+    protected $_voucherId = null;
     protected $_quantity;
-    protected $_oldPrice;
+    protected $_oldPrice = null;
 
     /**
      * @return int
@@ -44,6 +45,20 @@ trait CartPositionTrait
      */
     public function setOldPrice($price) {
         $this->_oldPrice = $price;
+    }
+
+    /**
+     * @return int
+     */
+    public function getVoucherId() {
+        return $this->_voucherId;
+    }
+
+    /**
+     * @param int $id
+     */
+    public function setVoucherId($id) {
+        $this->_voucherId = $id;
     }
 
     /**
