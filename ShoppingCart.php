@@ -341,14 +341,18 @@ class ShoppingCart extends Component
             $this->saveToSession();
 
         // remove all from cart for current user
-        $models = Cart::findAll(['id_user'=>Yii::$app->user->getId()]);
-        $productModel = $this->productModel;
-        foreach ($models as $model) {
-            $model2 = $productModel::findOne([$productModel::tableName().'.id' => $model->id]);
-            if(!is_null($model2)) {
-                $this->saveToDb($model2, 0, 0);
-            }
-        }
+//        if (!\Yii::$app->user->isGuest) {
+//            $models = Cart::findAll(['session' => Yii::$app->session->id]);
+//        } else {
+//            $models = Cart::findAll(['id_user' => Yii::$app->user->getId()]);
+//        }
+//        $productModel = $this->productModel;
+//        foreach ($models as $model) {
+//            $model2 = $productModel::findOne([$productModel::tableName().'.id' => $model->id]);
+//            if(!is_null($model2)) {
+//                $this->saveToDb($model2, 0, 0);
+//            }
+//        }
     }
 
     /**
